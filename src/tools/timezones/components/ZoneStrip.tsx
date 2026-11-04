@@ -10,14 +10,17 @@ function tone(hour: number) {
   return 'bg-slate-500/10 text-[var(--muted)]'
 }
 
-/** 24 one-hour cells aligned to the home zone's day; shows this zone's local hour in each. */
-export function ZoneStrip({ zone, dayStart, cursorIndex, onPick }: { zone: string; dayStart: number; cursorIndex: number; onPick: (i: number) => void }) {
+/**
+ * One-hour cells covering the home zone's local day (23 or 25 on clock-change days);
+ * shows this zone's local time in each.
+ */
+export function ZoneStrip({ zone, dayStart, hours, cursorIndex, onPick }: { zone: string; dayStart: number; hours: number; cursorIndex: number; onPick: (i: number) => void }) {
   const cells = useMemo(
-    () => Array.from({ length: 24 }, (_, i) => zonedParts(zone, dayStart + i * 3_600_000)),
-    [zone, dayStart],
+    () => Array.from({ length: hours }, (_, i) => zonedParts(zone, dayStart + i * 3_600_000)),
+    [zone, dayStart, hours],
   )
   return (
-    <div className="flex min-w-0 flex-1 gap-px" role="group" aria-label={`24-hour strip for ${zone}`}>
+    <div className="flex min-w-0 flex-1 gap-px" role="group" aria-label={`Hour strip for ${zone}`}>
       {cells.map((p, i) => (
         <button
           key={i}

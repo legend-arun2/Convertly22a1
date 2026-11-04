@@ -40,8 +40,8 @@ src/
 
 Navigation, routing, the home page and search pick it up automatically. Each tool is code-split.
 
-- **Saved data** (favourites, history): use `storage` from `src/services/storage.ts`. To add accounts later, implement `StorageService` against a backend; no tool code changes.
-- **Live data** (e.g. currency rates): use `getJson` from `src/services/http.ts` (cached fetch).
+- **Saved data** (favourites, history): use `usePersistentState(key, initial, validator)` or `storage` from `src/services/storage.ts`. Stored data is untrusted, so every read needs a validator. To add accounts later, implement `StorageService` against a backend; no tool code changes.
+- **Live data** (e.g. currency rates): use `getJson(url, validate)` from `src/services/http.ts`. Add the API host to `ALLOWED_HOSTS` and to the CSP `connect-src` (in `vite.config.ts` and `vercel.json`). Never put API secrets in `VITE_*` variables: they are public. Use a server-side proxy.
 
 ### Time zone data
 
@@ -52,6 +52,13 @@ npm run gen:tz
 ```
 
 The conversions themselves use the browser's built-in `Intl` API, which ships an up-to-date tz database.
+
+## Security
+
+- Production builds include a strict Content-Security-Policy (`vite.config.ts`). The Vercel config also sends it as an HTTP header, with `frame-ancestors 'none'`.
+- No source maps are shipped. URL parameters and stored data are validated, and crashes are contained by an error boundary.
+- CI uses least-privilege permissions, SHA-pinned actions and `npm ci --ignore-scripts`. Dependabot keeps actions and npm packages up to date.
+- Before adding accounts, move to a dedicated domain (e.g. Vercel). On `*.github.io`, browser storage is shared with the owner's other Pages sites.
 
 ## Deployment
 

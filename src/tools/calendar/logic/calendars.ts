@@ -57,6 +57,7 @@ function intlFormat(calendar: string, range: { from?: [number, number, number]; 
   return (date: number) => {
     if (date < lo) return 'Before this calendar’s epoch'
     if (date > hi) return 'Outside the published range'
+    if (Math.abs(fixedToEpochMs(date)) > 8.64e15) return 'Beyond the range browsers support (±275,000 years)'
     try {
       return new Intl.DateTimeFormat('en', { calendar, timeZone: 'UTC', dateStyle: 'long' }).format(fixedToEpochMs(date))
     } catch {
@@ -124,6 +125,8 @@ export const calendars: CalendarSystem[] = [
 
 export const inputCalendars = calendars.filter((c) => c.kind === 'exact')
 export const getCalendar = (id: string) => calendars.find((c) => c.id === id)
+/** Calendars usable for input; unknown or display-only ids fall back to Gregorian. */
+export const getInputCalendar = (id: string) => inputCalendars.find((c) => c.id === id) ?? inputCalendars[0]
 
 export function weekday(date: number) {
   return WEEKDAYS[dayOfWeek(date)]
@@ -132,7 +135,10 @@ export function weekday(date: number) {
 /** Clamp a date to valid ranges for the calendar (e.g. 31 Feb → 28/29 Feb). */
 export function normalize(cal: CalendarSystem, d: YMD): YMD {
   const months = cal.months!(d.year).map((m) => m.value)
-  const month = months.includes(d.month) ? d.month : months[0]
-  const day = Math.min(Math.max(1, d.day), cal.daysInMonth!(d.year, month))
+  let month = d.month
+  // Hebrew Adar II (13) only exists in leap years: fall back to Adar (12), not to the first month.
+  if (cal.id === 'hebrew' && month === 13 && !months.includes(13)) month = 12
+  if (!months.includes(month)) month = months[0]
+  const day = Number.isFinite(d.day) ? Math.min(Math.max(1, Math.trunc(d.day)), cal.daysInMonth!(d.year, month)) : 1
   return { year: d.year, month, day }
 }

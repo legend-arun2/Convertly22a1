@@ -80,7 +80,7 @@ export const categories: Category[] = [
     ],
   },
   {
-    id: 'temperature', name: 'Temperature', baseUnit: 'k', defaultFrom: 'c', defaultTo: 'f',
+    id: 'temperature', name: 'Temperature', baseUnit: 'k', defaultFrom: 'c', defaultTo: 'f', minBase: 0,
     units: [
       temp('c', 'Celsius', '°C', M, (v) => v + 273.15, (k) => k - 273.15),
       temp('k', 'Kelvin', 'K', M, (v) => v, (k) => k),

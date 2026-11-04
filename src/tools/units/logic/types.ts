@@ -14,5 +14,7 @@ export interface Category {
   baseUnit: string
   defaultFrom: string
   defaultTo: string
+  /** Smallest physically meaningful value, in base units (e.g. 0 K). */
+  minBase?: number
   units: Unit[]
 }

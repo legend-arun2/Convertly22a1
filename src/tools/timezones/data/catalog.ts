@@ -11,6 +11,30 @@ for (const c of Object.values(geo.countries) as CountryInfo[]) countryByCode.set
 export const zoneGeo: ZoneGeo[] = (geo.zones as ZoneGeo[]).filter((z) => isValidZone(z.id))
 export const zoneGeoById = new Map(zoneGeo.map((z) => [z.id, z]))
 
+/**
+ * Browsers may report legacy names (Asia/Calcutta, Europe/Kiev) for zones our map data lists
+ * under current names (Asia/Kolkata, Europe/Kyiv). Map every name to one canonical id.
+ */
+const resolvedName = (z: string) => {
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: z }).resolvedOptions().timeZone } catch { return z }
+}
+let canonicalMap: Map<string, string> | null = null
+export function canonicalZone(zone: string): string {
+  if (!canonicalMap) {
+    canonicalMap = new Map()
+    for (const z of zoneGeo) {
+      canonicalMap.set(z.id, z.id)
+      canonicalMap.set(resolvedName(z.id), z.id)
+    }
+  }
+  return canonicalMap.get(zone) ?? canonicalMap.get(resolvedName(zone)) ?? zone
+}
+
+/** Canonical, valid, de-duplicated zone list (max `limit`). */
+export function cleanZones(zones: string[], limit = 50): string[] {
+  return [...new Set(zones.filter(isValidZone).map(canonicalZone))].slice(0, limit)
+}
+
 /** Look up a world-atlas feature (numeric ISO id, or name for disputed areas). */
 export function countryForFeature(id: string | number | undefined, name: string): CountryInfo | undefined {
   const c = (id != null ? (geo.countries as Record<string, CountryInfo>)[String(id)] : undefined) ?? (geo.countries as Record<string, CountryInfo>)[`name:${name}`]
@@ -53,8 +77,7 @@ export function allZoneIds(): string[] {
   try {
     ids = (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone')
   } catch { /* older browser */ }
-  const set = new Set([...ids, ...zoneGeo.map((z) => z.id), 'UTC'])
-  return [...set].filter(isValidZone).sort()
+  return cleanZones([...ids, ...zoneGeo.map((z) => z.id), 'UTC'], Infinity).sort()
 }
 
 export function zoneOptions(epochMs: number) {

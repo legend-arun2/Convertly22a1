@@ -3,7 +3,7 @@ import { Card, CopyButton, Field, Input, PageHeader, Segmented, Select, SwapButt
 import { useUrlState } from '../../lib/useUrlState'
 import { formatNumber } from '../../lib/format'
 import { categories, comparisons, references } from './data/units'
-import { convert, findUnit, parseNumber } from './logic/convert'
+import { belowMinimum, convert, findUnit, parseNumber } from './logic/convert'
 import type { Category } from './logic/types'
 
 export default function UnitsPage() {
@@ -28,7 +28,9 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
   const cat = categories.find((c) => c.id === s.cat) ?? categories[0]
   const from = findUnit(cat, s.from) ? s.from : cat.defaultFrom
   const to = findUnit(cat, s.to) ? s.to : cat.defaultTo
-  const value = parseNumber(s.v)
+  const parsed = parseNumber(s.v)
+  const tooLow = !Number.isNaN(parsed) && belowMinimum(parsed, cat, from)
+  const value = tooLow ? NaN : parsed
   const result = Number.isNaN(value) ? NaN : convert(value, cat, from, to)
   const fromU = findUnit(cat, from)!
   const toU = findUnit(cat, to)!
@@ -58,7 +60,9 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
           <div className="mt-5 flex items-center gap-2 rounded-xl bg-[var(--surface-2)] px-4 py-4">
             <p className="min-w-0 flex-1 break-words text-lg sm:text-2xl">
               {Number.isNaN(value) ? (
-                <span className="text-sm text-[var(--muted)]">Enter a number to convert.</span>
+                <span className={'text-sm ' + (tooLow ? 'text-red-500' : 'text-[var(--muted)]')}>
+                  {tooLow ? 'That is below absolute zero (0 K = −273.15 °C = −459.67 °F), which is physically impossible.' : 'Enter a number to convert.'}
+                </span>
               ) : (
                 <>
                   <span className="text-[var(--muted)] tabular">{formatNumber(value)} {fromU.symbol} =</span>{' '}

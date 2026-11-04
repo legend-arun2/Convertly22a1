@@ -1,8 +1,7 @@
-import { useMemo } from 'react'
 import { CalendarDays, Info } from 'lucide-react'
 import { Card, CopyButton, Field, Input, PageHeader, Segmented, Select } from '../../components/ui'
 import { useUrlState } from '../../lib/useUrlState'
-import { calendars, getCalendar, inputCalendars, normalize, weekday } from './logic/calendars'
+import { calendars, getInputCalendar, inputCalendars, normalize, weekday } from './logic/calendars'
 import { fixedFromGregorian, gregorianFromFixed, jdnFromFixed } from './logic/gregorianJulian'
 import { fromAstronomical, formatEraYear, isoYear, toAstronomical, type Era, type Notation } from './logic/era'
 
@@ -12,25 +11,46 @@ function today() {
 }
 
 export default function CalendarPage() {
-  const t = useMemo(today, [])
-  const [s, set] = useUrlState({ cal: 'gregorian', era: 'AD', y: t.y, m: t.m, d: t.d, n: 'ADBC' })
-  const cal = getCalendar(s.cal) ?? inputCalendars[0]
+  // Empty defaults mean "today" (resolved at render), so shared links always carry the full date
+  // the sender picked, and an untouched page never shows a stale day after midnight.
+  const t = today()
+  const [s, set] = useUrlState({ cal: 'gregorian', era: 'AD', y: '', m: '', d: '', n: 'ADBC' })
+  const cal = getInputCalendar(s.cal)
   const notation = (s.n === 'CEBCE' ? 'CEBCE' : 'ADBC') as Notation
+  const era: Era = s.era === 'BC' ? 'BC' : 'AD'
+  const usingToday = s.y === '' && s.m === '' && s.d === ''
 
   // Resolve inputs to an internal (astronomical) date
-  const yearNum = Number(s.y)
+  let yearStr = s.y, monthNum = Number(s.m), dayNum = Number(s.d), inputEra = era
+  if (usingToday) {
+    const v = cal.fromFixed!(fixedFromGregorian({ year: Number(t.y), month: Number(t.m), day: Number(t.d) }))
+    const e = fromAstronomical(v.year)
+    yearStr = String(cal.usesEra ? e.year : v.year)
+    inputEra = e.era
+    monthNum = v.month
+    dayNum = v.day
+  }
+  const yearNum = yearStr.trim() === '' ? NaN : Number(yearStr)
   const yearValid = Number.isInteger(yearNum) && (cal.usesEra ? yearNum >= 1 : true) && Math.abs(yearNum) < 1_000_000
-  const astroYear = yearValid ? (cal.usesEra ? toAstronomical(yearNum, s.era as Era) : yearNum) : NaN
-  const ymd = yearValid ? normalize(cal, { year: astroYear, month: Number(s.m), day: Number(s.d) }) : null
+  const astroYear = yearValid ? (cal.usesEra ? toAstronomical(yearNum, inputEra) : yearNum) : NaN
+  const ymd = yearValid ? normalize(cal, { year: astroYear, month: monthNum, day: dayNum }) : null
   const fixed = ymd ? cal.toFixed!(ymd) : null
+  const shownEra: Era = ymd && cal.usesEra ? fromAstronomical(ymd.year).era : era
 
   const setFromFixed = (calId: string, date: number) => {
-    const c = getCalendar(calId)!
+    const c = getInputCalendar(calId)
     const v = c.fromFixed!(date)
     if (c.usesEra) {
       const { year, era } = fromAstronomical(v.year)
       set({ cal: calId, era, y: String(year), m: String(v.month), d: String(v.day) })
     } else set({ cal: calId, y: String(v.year), m: String(v.month), d: String(v.day) })
+  }
+  /** Changing one field turns an implicit "today" into explicit values. */
+  const setField = (patch: { era?: string; y?: string; m?: string; d?: string }) => {
+    if (usingToday && ymd) {
+      const base = cal.usesEra ? fromAstronomical(ymd.year) : { year: ymd.year, era: 'AD' as Era }
+      set({ era: base.era, y: String(base.year), m: String(ymd.month), d: String(ymd.day), ...patch })
+    } else set(patch)
   }
 
   const months = ymd ? cal.months!(ymd.year) : []
@@ -63,22 +83,22 @@ export default function CalendarPage() {
               {cal.usesEra && (
                 <Field label="Era">
                   <Select
-                    value={s.era}
-                    onChange={(e) => set({ era: e.target.value })}
+                    value={shownEra}
+                    onChange={(e) => setField({ era: e.target.value })}
                     options={[{ value: 'AD', label: notation === 'CEBCE' ? 'CE' : 'AD' }, { value: 'BC', label: notation === 'CEBCE' ? 'BCE' : 'BC' }]}
                   />
                 </Field>
               )}
               <Field label="Year">
-                <Input inputMode="numeric" value={s.y} onChange={(e) => set({ y: e.target.value.trim() })} aria-invalid={!yearValid} />
+                <Input inputMode="numeric" value={yearStr} onChange={(e) => setField({ y: e.target.value.trim() })} aria-invalid={!yearValid} />
               </Field>
               <Field label="Month">
-                <Select value={String(ymd?.month ?? s.m)} onChange={(e) => set({ m: e.target.value })} options={months.map((m) => ({ value: String(m.value), label: m.label }))} />
+                <Select value={String(ymd?.month ?? monthNum)} onChange={(e) => setField({ m: e.target.value })} options={months.map((m) => ({ value: String(m.value), label: m.label }))} />
               </Field>
               <Field label="Day">
                 <Select
-                  value={String(ymd?.day ?? s.d)}
-                  onChange={(e) => set({ d: e.target.value })}
+                  value={String(ymd?.day ?? dayNum)}
+                  onChange={(e) => setField({ d: e.target.value })}
                   options={Array.from({ length: dayCount }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
                 />
               </Field>

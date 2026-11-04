@@ -1,4 +1,5 @@
 /** Time zone math using only the built-in Intl API (DST-correct, no extra library). */
+import { utcMs } from '../../../lib/dates'
 
 const dtfCache = new Map<string, Intl.DateTimeFormat>()
 function dtf(zone: string, opts: Intl.DateTimeFormatOptions, key: string) {
@@ -42,7 +43,7 @@ export function zonedParts(zone: string, epochMs: number): ZonedParts {
 /** UTC offset in minutes (e.g. +330 for India) at the given instant. */
 export function offsetMinutes(zone: string, epochMs: number): number {
   const p = zonedParts(zone, epochMs)
-  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second)
+  const asUtc = utcMs(p.year, p.month, p.day, p.hour, p.minute, p.second)
   const ms = Math.floor(epochMs / 1000) * 1000
   return Math.round((asUtc - ms) / 60000)
 }
@@ -52,13 +53,15 @@ export function offsetMinutes(zone: string, epochMs: number): number {
  * repeated times resolve to the earlier occurrence (same as Temporal's "compatible").
  */
 export function wallTimeToEpoch(zone: string, y: number, mo: number, d: number, h: number, mi: number): number {
-  const utcGuess = Date.UTC(y, mo - 1, d, h, mi)
-  const o1 = offsetMinutes(zone, utcGuess - 0)
+  const utcGuess = utcMs(y, mo, d, h, mi)
+  if (!Number.isFinite(utcGuess)) return NaN
+  const o1 = offsetMinutes(zone, utcGuess)
   const t1 = utcGuess - o1 * 60000
   const o2 = offsetMinutes(zone, t1)
   if (o1 === o2) {
-    // Check for an earlier valid occurrence (repeated hour when clocks go back).
-    const oBefore = offsetMinutes(zone, t1 - 3 * 3600_000)
+    // Check for an earlier valid occurrence (repeated time when clocks go back). The window
+    // covers historic shifts of many hours; the candidate is validated before use.
+    const oBefore = offsetMinutes(zone, t1 - 25 * 3600_000)
     const tEarlier = utcGuess - oBefore * 60000
     if (oBefore !== o1 && offsetMinutes(zone, tEarlier) === oBefore) return tEarlier
     return t1
@@ -120,5 +123,5 @@ export function localZone(): string {
 /** Calendar-day difference between two zones' local dates (−1, 0, +1). */
 export function dayShift(zone: string, refZone: string, epochMs: number): number {
   const a = zonedParts(zone, epochMs), b = zonedParts(refZone, epochMs)
-  return Math.round((Date.UTC(a.year, a.month - 1, a.day) - Date.UTC(b.year, b.month - 1, b.day)) / 86_400_000)
+  return Math.round((utcMs(a.year, a.month, a.day) - utcMs(b.year, b.month, b.day)) / 86_400_000)
 }

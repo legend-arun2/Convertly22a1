@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Clock, Home, MapPinned, X } from 'lucide-react'
 import { Card, Combobox, Field, Input, PageHeader, Segmented } from '../../components/ui'
 import { usePersistentState } from '../../lib/usePersistentState'
@@ -6,27 +6,31 @@ import { useUrlState } from '../../lib/useUrlState'
 import { useNow } from '../../lib/useNow'
 import { WorldMap } from './map/WorldMap'
 import { ZoneStrip } from './components/ZoneStrip'
-import { zoneLabel, zoneOptions } from './data/catalog'
+import { canonicalZone, cleanZones, zoneLabel, zoneOptions } from './data/catalog'
+import { isBoolean, isStringArray } from '../../services/storage'
+import { utcMs } from '../../lib/dates'
+import { parseDateTime } from './logic/parse'
 import { colorFor } from './logic/colors'
 import { abbreviation, dayShift, formatDate, formatDiff, formatOffset, formatTime, isValidZone, localZone, offsetMinutes, wallTimeToEpoch, zonedParts } from './logic/tz'
 
-const DEFAULT_ZONES = [...new Set([localZone(), 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo'])].slice(0, 4)
+const MAX_ZONES = 50
+const DEFAULT_ZONES = cleanZones([localZone(), 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo']).slice(0, 4)
 
 export default function TimezonesPage() {
   const now = useNow(1000)
   const [s, set] = useUrlState({ view: 'compare' })
-  const [stored, setZones] = usePersistentState<string[]>('tz:zones', DEFAULT_ZONES)
-  const zones = useMemo(() => stored.filter(isValidZone), [stored])
-  const [hour12, setHour12] = usePersistentState('tz:hour12', false)
+  const [stored, setZones] = usePersistentState('tz:zones', DEFAULT_ZONES, isStringArray(MAX_ZONES))
+  const zones = useMemo(() => cleanZones(stored, MAX_ZONES), [stored])
+  const [hour12, setHour12] = usePersistentState('tz:hour12', false, isBoolean)
   /** null = live "now"; otherwise a pinned instant. */
   const [pinned, setPinned] = useState<number | null>(null)
   const ref = pinned ?? now
   const options = useMemo(() => zoneOptions(Date.now()), [])
 
-  const addZone = (z: string) => setZones((zs) => (zs.includes(z) ? zs : [...zs, z]))
-  const removeZone = (z: string) => setZones((zs) => zs.filter((x) => x !== z))
-  const makeHome = (z: string) => setZones((zs) => [z, ...zs.filter((x) => x !== z)])
-  const mapZones = zones.map((zone, i) => ({ zone, color: colorFor(i) }))
+  const addZone = useCallback((z: string) => setZones((zs) => cleanZones([...zs, canonicalZone(z)], MAX_ZONES)), [setZones])
+  const removeZone = (z: string) => setZones((zs) => cleanZones(zs, MAX_ZONES).filter((x) => x !== z))
+  const makeHome = (z: string) => setZones((zs) => [z, ...cleanZones(zs, MAX_ZONES).filter((x) => x !== z)])
+  const mapZones = useMemo(() => zones.map((zone, i) => ({ zone, color: colorFor(i) })), [zones])
 
   return (
     <div>
@@ -108,7 +112,11 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
   const home = zones[0]
   const hp = zonedParts(home, refTime)
   const dayStart = wallTimeToEpoch(home, hp.year, hp.month, hp.day, 0, 0)
-  const cursorIndex = Math.floor((refTime - dayStart) / 3_600_000)
+  // Next local midnight: days with a clock change have 23 or 25 hours.
+  const next = new Date(utcMs(hp.year, hp.month, hp.day) + 86_400_000)
+  const dayEnd = wallTimeToEpoch(home, next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 0, 0)
+  const hours = Math.max(1, Math.ceil((dayEnd - dayStart) / 3_600_000))
+  const cursorIndex = Math.min(hours - 1, Math.floor((refTime - dayStart) / 3_600_000))
   const homeOffset = offsetMinutes(home, refTime)
 
   return (
@@ -133,7 +141,7 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
                 <div className="text-lg font-semibold tabular leading-tight">{formatTime(z, refTime, hour12)}</div>
                 <div className="text-xs text-[var(--muted)]">
                   {formatDate(z, refTime)}
-                  {shift !== 0 && <span className="ml-1 font-medium text-[var(--accent)]">{shift > 0 ? '+1 day' : '−1 day'}</span>}
+                  {shift !== 0 && <span className="ml-1 font-medium text-[var(--accent)]">{formatDayShift(shift)}</span>}
                 </div>
               </div>
               <div className="flex shrink-0 flex-col">
@@ -143,7 +151,7 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
                 <button aria-label={`Remove ${z}`} title="Remove" onClick={() => onRemove(z)} className="rounded p-1 text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"><X size={13} /></button>
               </div>
             </div>
-            <ZoneStrip zone={z} dayStart={dayStart} cursorIndex={cursorIndex} onPick={(h) => onPick(dayStart + h * 3_600_000 + (refTime - dayStart) % 3_600_000)} />
+            <ZoneStrip zone={z} dayStart={dayStart} hours={hours} cursorIndex={cursorIndex} onPick={(h) => onPick(dayStart + h * 3_600_000 + (refTime - dayStart) % 3_600_000)} />
           </li>
         )
       })}
@@ -175,12 +183,11 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
   const pad = (n: number) => String(n).padStart(2, '0')
   const date = u.date || `${String(nowParts.year).padStart(4, '0')}-${pad(nowParts.month)}-${pad(nowParts.day)}`
   const time = u.time || `${pad(nowParts.hour)}:${pad(nowParts.minute)}`
-  const [y, mo, d] = date.split('-').map(Number)
-  const [h, mi] = time.split(':').map(Number)
-  const valid = [y, mo, d, h, mi].every(Number.isFinite)
-  const t = valid ? wallTimeToEpoch(from, y, mo, d, h, mi) : NaN
+  const parsed = parseDateTime(date, time)
+  const t = parsed ? wallTimeToEpoch(from, parsed.y, parsed.mo, parsed.d, parsed.h, parsed.mi) : NaN
+  const valid = parsed != null && Number.isFinite(t) && Math.abs(t) < 8.6e15
   const back = valid ? zonedParts(from, t) : null
-  const shifted = back && (back.hour !== h || back.minute !== mi)
+  const shifted = valid && back && (back.hour !== parsed.h || back.minute !== parsed.mi)
   const targets = zones.filter((z) => z !== from)
 
   return (
@@ -195,7 +202,7 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
             <Field label="Time"><Input type="time" value={time} onChange={(e) => set({ time: e.target.value })} /></Field>
           </div>
           <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-            <span>{valid ? `${abbreviation(from, t)} · ${formatOffset(offsetMinutes(from, t))}` : 'Enter a date and time'}</span>
+            <span className={valid ? '' : 'text-red-500'}>{valid ? `${abbreviation(from, t)} · ${formatOffset(offsetMinutes(from, t))}` : 'Enter a valid date (years 1–275000) and time'}</span>
             <button onClick={() => set({ date: '', time: '' })} className="text-[var(--accent)] hover:underline">Use current time</button>
           </div>
           {shifted && (
@@ -230,7 +237,7 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
                     <div className="text-xl font-semibold tabular">{formatTime(z, t, hour12)}</div>
                     <div className="text-xs text-[var(--muted)]">
                       {formatDate(z, t)}
-                      {shift !== 0 && <span className="ml-1 font-medium text-[var(--accent)]">{shift > 0 ? `+${shift} day` : `${shift} day`}</span>}
+                      {shift !== 0 && <span className="ml-1 font-medium text-[var(--accent)]">{formatDayShift(shift)}</span>}
                     </div>
                   </div>
                 </li>
@@ -242,3 +249,9 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
     </div>
   )
 }
+
+function formatDayShift(shift: number) {
+  const n = Math.abs(shift)
+  return `${shift > 0 ? '+' : '−'}${n} day${n === 1 ? '' : 's'}`
+}
+

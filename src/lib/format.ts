@@ -6,6 +6,5 @@ export function formatNumber(n: number, maxSig = 8): string {
   if (abs >= 1e15 || abs < 1e-6) {
     return n.toExponential(Math.min(maxSig - 1, 6)).replace(/\.?0+e/, 'e')
   }
-  const rounded = Number(n.toPrecision(maxSig))
-  return rounded.toLocaleString('en-US', { maximumFractionDigits: 10 })
+  return n.toLocaleString('en-US', { maximumSignificantDigits: maxSig })
 }

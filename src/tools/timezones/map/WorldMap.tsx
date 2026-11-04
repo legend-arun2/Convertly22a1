@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { geoCircle, geoEqualEarth, geoGraticule10, geoPath } from 'd3-geo'
 import { select } from 'd3-selection'
 import 'd3-transition'
@@ -42,7 +42,7 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const [t, setT] = useState({ k: 1, x: 0, y: 0 })
   const [hover, setHover] = useState<Hover>(null)
-  const [picker, setPicker] = useState<{ info: CountryInfo; x: number; y: number } | null>(null)
+  const [picker, setPicker] = useState<{ info: CountryInfo; x: number; y: number; docked: boolean } | null>(null)
 
   useEffect(() => {
     const svg = select(svgRef.current!)
@@ -72,35 +72,45 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
   const selectedSet = useMemo(() => new Set(selected.map((s) => s.zone)), [selected])
   const countryColor = useMemo(() => {
     const m = new Map<string, string>()
+    // Colour only each zone's primary country (Europe/Berlin also covers Denmark, Norway…).
     for (const s of selected) {
-      const g = zoneGeoById.get(s.zone)
-      g?.cc.forEach((cc) => { if (!m.has(cc)) m.set(cc, s.color) })
+      const cc = zoneGeoById.get(s.zone)?.cc[0]
+      if (cc && !m.has(cc)) m.set(cc, s.color)
     }
     return m
   }, [selected])
 
-  const relPos = (e: React.MouseEvent) => {
+  const relPos = useCallback((e: React.MouseEvent) => {
     const r = wrapRef.current!.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
-  }
+  }, [])
 
-  const onCountryClick = (info: CountryInfo | undefined, e: React.MouseEvent) => {
+  // Latest values via refs, so the memoised country layer gets stable callbacks.
+  const latest = useRef({ epochMs, onAdd })
+  latest.current = { epochMs, onAdd }
+
+  const onCountryHover = useCallback(
+    (name: string, info: CountryInfo | undefined, e: React.MouseEvent) => setHover({ kind: 'country', name, info, ...relPos(e) }),
+    [relPos],
+  )
+  const onCountryClick = useCallback((info: CountryInfo | undefined, e: React.MouseEvent) => {
     if (!info || info.zones.length === 0) return
-    const groups = groupByOffset(info.zones, epochMs)
-    if (info.zones.length === 1 || groups.length === 1) onAdd(info.zones[0])
-    else setPicker({ info, ...relPos(e) })
-  }
+    const groups = groupByOffset(info.zones, latest.current.epochMs)
+    if (info.zones.length === 1 || groups.length === 1) latest.current.onAdd(info.zones[0])
+    // On narrow screens the map is short: show the picker as a panel below it instead.
+    else setPicker({ info, ...relPos(e), docked: (wrapRef.current?.clientWidth ?? 0) < 560 })
+  }, [relPos])
 
   const showAllMarkers = t.k >= 2.5
   const markerR = (base: number) => base / Math.sqrt(t.k)
 
   return (
+    <div>
     <div ref={wrapRef} className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--ocean)]" onMouseLeave={() => setHover(null)}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid slice"
-        className="block h-[300px] w-full sm:h-auto cursor-grab touch-none select-none active:cursor-grabbing"
+        className="block h-auto w-full cursor-grab touch-none select-none active:cursor-grabbing"
         role="img"
         aria-label="Interactive world map. Click a country to add its time zone."
       >
@@ -110,7 +120,7 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
           <Countries
             hoverName={hover?.kind === 'country' ? hover.name : null}
             countryColor={countryColor}
-            onHover={(name, info, e) => setHover({ kind: 'country', name, info, ...relPos(e) })}
+            onHover={onCountryHover}
             onClick={onCountryClick}
           />
           <g pointerEvents="none" data-testid="night-layer">
@@ -164,8 +174,10 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
         {showAllMarkers ? 'Click a dot to add that zone' : 'Click a country · scroll or pinch to zoom for cities'}
       </div>
 
-      {hover && !picker && <Tooltip hover={hover} epochMs={epochMs} />}
-      {picker && <ZonePicker {...picker} epochMs={epochMs} onPick={(z) => { onAdd(z); setPicker(null) }} onClose={() => setPicker(null)} />}
+      {hover && !picker && <Tooltip hover={hover} epochMs={epochMs} wrap={wrapRef} />}
+      {picker && !picker.docked && <ZonePicker {...picker} wrap={wrapRef} epochMs={epochMs} onPick={(z) => { onAdd(z); setPicker(null) }} onClose={() => setPicker(null)} />}
+    </div>
+    {picker?.docked && <ZonePicker {...picker} wrap={wrapRef} epochMs={epochMs} onPick={(z) => { onAdd(z); setPicker(null) }} onClose={() => setPicker(null)} />}
     </div>
   )
 }
@@ -210,12 +222,35 @@ function MapBtn({ label, onClick, children }: { label: string; onClick: () => vo
   )
 }
 
-function place(x: number, y: number) {
-  // Keep the floating box inside the map.
-  return { left: Math.max(8, x + 14), top: Math.max(8, y + 14), transform: x > 520 ? 'translateX(calc(-100% - 28px))' : undefined }
+/**
+ * A box placed next to the pointer and kept inside the map: flips to the other side when it
+ * would overflow, then clamps on both axes. Measured before paint, so there is no jump.
+ */
+function Floating({ x, y, wrap, className, role, children }: { x: number; y: number; wrap: RefObject<HTMLDivElement | null>; className: string; role?: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: x + 14, top: y + 14, maxHeight: 288 })
+  useLayoutEffect(() => {
+    const el = ref.current, w = wrap.current
+    if (!el || !w) return
+    const W = w.clientWidth, H = w.clientHeight, gap = 14, pad = 8
+    const maxHeight = Math.max(80, H - 2 * pad)
+    const ew = el.offsetWidth, eh = Math.min(el.scrollHeight, maxHeight)
+    let left = x + gap
+    if (left + ew > W - pad) left = x - gap - ew
+    left = Math.max(pad, Math.min(left, W - ew - pad))
+    let top = y + gap
+    if (top + eh > H - pad) top = y - gap - eh
+    top = Math.max(pad, Math.min(top, H - eh - pad))
+    if (left !== pos.left || top !== pos.top || maxHeight !== pos.maxHeight) setPos({ left, top, maxHeight })
+  })
+  return (
+    <div ref={ref} role={role} className={'absolute overflow-auto ' + className} style={pos}>
+      {children}
+    </div>
+  )
 }
 
-function Tooltip({ hover, epochMs }: { hover: NonNullable<Hover>; epochMs: number }) {
+function Tooltip({ hover, epochMs, wrap }: { hover: NonNullable<Hover>; epochMs: number; wrap: RefObject<HTMLDivElement | null> }) {
   let body: React.ReactNode
   if (hover.kind === 'zone') {
     const g = zoneGeoById.get(hover.zone)
@@ -239,9 +274,9 @@ function Tooltip({ hover, epochMs }: { hover: NonNullable<Hover>; epochMs: numbe
     )
   }
   return (
-    <div role="tooltip" className="pointer-events-none absolute z-10 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs shadow-lg" style={place(hover.x, hover.y)}>
+    <Floating x={hover.x} y={hover.y} wrap={wrap} role="tooltip" className="pointer-events-none z-10 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs shadow-lg">
       {body}
-    </div>
+    </Floating>
   )
 }
 
@@ -255,10 +290,15 @@ function ZoneLine({ zone, epochMs }: { zone: string; epochMs: number }) {
 }
 
 
-function ZonePicker({ info, x, y, epochMs, onPick, onClose }: { info: CountryInfo; x: number; y: number; epochMs: number; onPick: (z: string) => void; onClose: () => void }) {
+function ZonePicker({ info, x, y, docked, wrap, epochMs, onPick, onClose }: { info: CountryInfo; x: number; y: number; docked: boolean; wrap: RefObject<HTMLDivElement | null>; epochMs: number; onPick: (z: string) => void; onClose: () => void }) {
   const groups = groupByOffset(info.zones, epochMs)
-  return (
-    <div className="absolute z-20 max-h-72 w-64 overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-xl" style={place(x, y)}>
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const content = (
+    <>
       <div className="mb-1 flex items-center justify-between px-1">
         <span className="font-semibold">{info.name}</span>
         <button aria-label="Close" onClick={onClose} className="rounded p-1 text-[var(--muted)] hover:bg-[var(--surface-2)]"><X size={14} /></button>
@@ -274,6 +314,18 @@ function ZonePicker({ info, x, y, epochMs, onPick, onClose }: { info: CountryInf
           ))}
         </div>
       ))}
-    </div>
+    </>
+  )
+  if (docked) {
+    return (
+      <div role="dialog" aria-label={`Choose a time zone in ${info.name}`} className="mt-2 max-h-80 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-sm">
+        {content}
+      </div>
+    )
+  }
+  return (
+    <Floating x={x} y={y} wrap={wrap} role="dialog" className="z-20 w-64 max-w-[calc(100%-16px)] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-xl">
+      {content}
+    </Floating>
   )
 }

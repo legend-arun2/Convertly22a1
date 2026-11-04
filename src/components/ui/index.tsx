@@ -142,6 +142,11 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
     return list.slice(0, 80)
   }, [options, query])
 
+  // Keep the highlighted option visible while navigating with the keyboard.
+  useEffect(() => {
+    if (open) document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: 'nearest' })
+  }, [open, active, listId])
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDoc)
@@ -159,13 +164,16 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && filtered[active] ? `${listId}-${active}` : undefined}
           className={cn(control, 'pl-8')}
           placeholder={current ? current.label : placeholder}
           value={open ? query : current?.label ?? ''}
           onFocus={() => { setOpen(true); setActive(0) }}
+          onClick={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(0) }}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, filtered.length - 1)) }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, filtered.length - 1)) }
             else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
             else if (e.key === 'Enter' && filtered[active]) { e.preventDefault(); pick(filtered[active].value) }
             else if (e.key === 'Escape') setOpen(false)
@@ -178,6 +186,7 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
           {filtered.map((o, i) => (
             <li
               key={o.value}
+              id={`${listId}-${i}`}
               role="option"
               aria-selected={o.value === value}
               onMouseDown={(e) => { e.preventDefault(); pick(o.value) }}

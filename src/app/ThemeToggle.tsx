@@ -8,7 +8,7 @@ export function ThemeToggle() {
     const next = !dark
     setDark(next)
     document.documentElement.classList.toggle('dark', next)
-    storage.set('theme', next ? 'dark' : 'light')
+    storage.set('theme', next ? 'dark' : 'light') // read back by public/theme.js
   }
   return (
     <button
