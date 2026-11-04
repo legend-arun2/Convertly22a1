@@ -17,7 +17,7 @@ VITE_BASE=/Convertly22a1/ npx vite preview    # preview MUST get the same VITE_B
 npm run gen:tz                                # regenerate src/tools/timezones/data/geo.json
 ```
 
-Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). There are no component tests. Verify UI changes in a real browser: Playwright and Chromium are available via `require('playwright')` (run scripts with cwd at the repo root so the require resolves). After touching URL-bound inputs, check that typing mid-value keeps the caret and every keystroke. Check light, dark (`colorScheme: 'dark'`) and a 375px-wide viewport (`scrollWidth` must stay 375).
+Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). Besides the co-located `logic/` tests, `src/regressions.test.ts` pins every bug fixed in past reviews (add a case there when fixing one), and `src/security.test.ts` checks the CSP and header sync and that `index.html` has no inline scripts. There are no component tests. Verify UI changes in a real browser: Playwright and Chromium are available via `require('playwright')` (run scripts with cwd at the repo root so the require resolves). After touching URL-bound inputs, check that typing mid-value keeps the caret and every keystroke. Check light, dark (`colorScheme: 'dark'`) and a 375px-wide viewport (`scrollWidth` must stay 375).
 
 ## Architecture
 
@@ -65,4 +65,5 @@ Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). There are no com
 - **Cloud sandbox limits:**
   - `npm audit signatures` fails with a 403 because the proxy blocks Sigstore; it works on GitHub runners.
   - `*.github.io` is blocked, so the live site can't be fetched from here.
+  - `main` is protected by a repository ruleset, and pushes from this sandbox (to `main` or new branches) are declined. Commit locally and tell the user what to push, unless they've granted a bypass.
   - The `gh` token is invalid, but the unauthenticated GitHub REST API is readable. Check deploys with `curl -s "https://api.github.com/repos/legend-arun2/convertly22a1/actions/runs?head_sha=$(git rev-parse HEAD)"`, and job logs with `/actions/jobs/<id>/logs`.
