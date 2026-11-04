@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { tools } from '../tools/registry'
 import { Layout } from './Layout'
 import { Home } from './Home'
@@ -7,8 +7,10 @@ import { Home } from './Home'
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
 
 export function App() {
+  // useTransitions={false}: URL updates must be synchronous, otherwise controlled inputs whose
+  // value lives in the query string (useUrlState) drop keystrokes and lose the caret.
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename={basename} useTransitions={false}>
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Home />} />

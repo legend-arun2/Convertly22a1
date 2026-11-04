@@ -2,36 +2,28 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { CSP } from './csp.config'
 
 // VITE_BASE lets the same code deploy to GitHub Pages (/<repo>/) or Vercel (/).
 const base = process.env.VITE_BASE || '/'
 
-/**
- * Content-Security-Policy for production builds only (the dev server injects inline scripts).
- * Keep in sync with the header in vercel.json. When adding live-data APIs, list their hosts in connect-src.
- */
-export const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ')
-
+/** Adds the CSP <meta> to production builds only (the dev server injects inline scripts). */
 const cspPlugin = (): Plugin => ({
   name: 'csp-meta',
   apply: 'build',
-  transformIndexHtml: (html) =>
-    html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+  transformIndexHtml: {
+    order: 'post',
+    handler: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' }],
+  },
 })
 
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss(), cspPlugin()],
-  build: { sourcemap: false },
+  build: {
+    sourcemap: false,
+    // All supported browsers have native modulepreload; skipping the polyfill removes a fetch() from the bundle.
+    modulePreload: { polyfill: false },
+  },
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
 })

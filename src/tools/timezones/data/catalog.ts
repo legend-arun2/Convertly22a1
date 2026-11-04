@@ -27,7 +27,7 @@ export function canonicalZone(zone: string): string {
       canonicalMap.set(resolvedName(z.id), z.id)
     }
   }
-  return canonicalMap.get(zone) ?? canonicalMap.get(resolvedName(zone)) ?? zone
+  return canonicalMap.get(zone) ?? canonicalMap.get(resolvedName(zone)) ?? resolvedName(zone)
 }
 
 /** Canonical, valid, de-duplicated zone list (max `limit`). */
@@ -37,7 +37,9 @@ export function cleanZones(zones: string[], limit = 50): string[] {
 
 /** Look up a world-atlas feature (numeric ISO id, or name for disputed areas). */
 export function countryForFeature(id: string | number | undefined, name: string): CountryInfo | undefined {
-  const c = (id != null ? (geo.countries as Record<string, CountryInfo>)[String(id)] : undefined) ?? (geo.countries as Record<string, CountryInfo>)[`name:${name}`]
+  const all = geo.countries as Record<string, CountryInfo>
+  const get = (k: string) => (Object.hasOwn(all, k) ? all[k] : undefined)
+  const c = (id != null ? get(String(id)) : undefined) ?? get(`name:${name}`)
   if (!c) return undefined
   return { ...c, zones: c.zones.filter(isValidZone) }
 }
@@ -56,10 +58,10 @@ export const aliases: Record<string, string> = {
   MST: 'America/Denver', MDT: 'America/Denver', 'Mountain Time': 'America/Denver',
   CST: 'America/Chicago', CDT: 'America/Chicago', 'Central Time': 'America/Chicago',
   EST: 'America/New_York', EDT: 'America/New_York', 'Eastern Time': 'America/New_York',
-  AKST: 'America/Anchorage', HST: 'Pacific/Honolulu', GMT: 'Europe/London', BST: 'Europe/London',
+  AKST: 'America/Anchorage', AKDT: 'America/Anchorage', HST: 'Pacific/Honolulu', GMT: 'Europe/London', BST: 'Europe/London',
   CET: 'Europe/Paris', CEST: 'Europe/Paris', EET: 'Europe/Athens', MSK: 'Europe/Moscow',
   IST: 'Asia/Kolkata', PKT: 'Asia/Karachi', JST: 'Asia/Tokyo', KST: 'Asia/Seoul', SGT: 'Asia/Singapore',
-  AEST: 'Australia/Sydney', AEDT: 'Australia/Sydney', AWST: 'Australia/Perth', NZST: 'Pacific/Auckland',
+  AEST: 'Australia/Sydney', AEDT: 'Australia/Sydney', AWST: 'Australia/Perth', NZST: 'Pacific/Auckland', NZDT: 'Pacific/Auckland', ACST: 'Australia/Adelaide', SAST: 'Africa/Johannesburg', WAT: 'Africa/Lagos', EAT: 'Africa/Nairobi', HKT: 'Asia/Hong_Kong', WIB: 'Asia/Jakarta',
   'San Francisco': 'America/Los_Angeles', Seattle: 'America/Los_Angeles', Boston: 'America/New_York',
   Washington: 'America/New_York', Miami: 'America/New_York', Atlanta: 'America/New_York', Dallas: 'America/Chicago',
   Houston: 'America/Chicago', Montreal: 'America/Toronto', 'Delhi': 'Asia/Kolkata', 'New Delhi': 'Asia/Kolkata',
@@ -69,7 +71,7 @@ export const aliases: Record<string, string> = {
   Barcelona: 'Europe/Madrid', Munich: 'Europe/Berlin', Frankfurt: 'Europe/Berlin', Milan: 'Europe/Rome',
   'St Petersburg': 'Europe/Moscow', Geneva: 'Europe/Zurich', Melbourne: 'Australia/Melbourne', Rio: 'America/Sao_Paulo',
   'Rio de Janeiro': 'America/Sao_Paulo', Lagos: 'Africa/Lagos', Nairobi: 'Africa/Nairobi',
-  'Cape Town': 'Africa/Johannesburg', Hanoi: 'Asia/Bangkok', 'Ho Chi Minh': 'Asia/Ho_Chi_Minh',
+  'Cape Town': 'Africa/Johannesburg', Hanoi: 'Asia/Ho_Chi_Minh', Saigon: 'Asia/Ho_Chi_Minh', 'Ho Chi Minh': 'Asia/Ho_Chi_Minh',
 }
 
 export function allZoneIds(): string[] {

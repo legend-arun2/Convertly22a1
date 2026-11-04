@@ -1,11 +1,17 @@
 import { useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
+
+const MAX_PARAM_LENGTH = 256
 
 /** State stored in the URL query string, so any conversion can be shared as a link. */
 export function useUrlState<T extends Record<string, string>>(defaults: T) {
   const [params, setParams] = useSearchParams()
   const state = Object.fromEntries(
-    Object.entries(defaults).map(([k, d]) => [k, params.get(k) ?? d]),
+    Object.entries(defaults).map(([k, d]) => {
+      const raw = params.get(k)
+      // Over-long values are ignored: every value here is short (numbers, dates, ids).
+      return [k, raw != null && raw.length <= MAX_PARAM_LENGTH ? raw : d]
+    }),
   ) as T
   const update = useCallback(
     (patch: Partial<T>) => {
@@ -21,7 +27,6 @@ export function useUrlState<T extends Record<string, string>>(defaults: T) {
         { replace: true },
       )
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [setParams],
   )
   return [state, update] as const

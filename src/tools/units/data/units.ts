@@ -188,7 +188,7 @@ export const comparisons: { category: string; metric: string; other: string; val
 export const references: { label: string; metric: string; imperial: string }[] = [
   { label: 'Credit card width', metric: '8.56 cm', imperial: '3.37 in' },
   { label: 'Door height (typical)', metric: '2.03 m', imperial: '6 ft 8 in' },
-  { label: 'Football (soccer) pitch', metric: '0.71 ha', imperial: '1.76 acres' },
+  { label: 'Football (soccer) pitch', metric: '0.71 ha', imperial: '1.75 acres' },
   { label: 'Bag of sugar', metric: '1 kg', imperial: '2.2 lb' },
   { label: 'Bottle of water', metric: '500 mL', imperial: '16.9 US fl oz' },
   { label: 'Room temperature', metric: '20 °C', imperial: '68 °F' },

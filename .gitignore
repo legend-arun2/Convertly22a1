@@ -4,3 +4,7 @@ dist
 .DS_Store
 test-results
 *.tsbuildinfo
+# Local env files: Vite bundles any VITE_* value into public JS
+.env
+.env.*
+!.env.example

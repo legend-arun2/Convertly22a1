@@ -1,12 +1,15 @@
 import { Suspense } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { ErrorBoundary } from './ErrorBoundary'
 import { tools } from '../tools/registry'
 import { cn } from '../lib/cn'
 import { ThemeToggle } from './ThemeToggle'
 
 export function Layout() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
+  // Reset target comes from the registry, never from the raw URL (a path like "//evil.com"
+  // would otherwise become an off-site link).
+  const tool = tools.find((t) => pathname === `/${t.path}` || pathname.startsWith(`/${t.path}/`))
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur">
@@ -37,7 +40,7 @@ export function Layout() {
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:py-8">
         {/* Keyed by path: navigating to another tool clears an error. */}
-        <ErrorBoundary key={pathname} resetPath={pathname}>
+        <ErrorBoundary key={pathname} resetPath={tool ? `/${tool.path}` : '/'} resetKey={search}>
           <Suspense fallback={<div className="py-20 text-center text-sm text-[var(--muted)]">Loading…</div>}>
             <Outlet />
           </Suspense>

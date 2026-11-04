@@ -115,8 +115,8 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
         aria-label="Interactive world map. Click a country to add its time zone."
       >
         <g transform={`translate(${t.x},${t.y}) scale(${t.k})`}>
-          <path d={spherePath} fill="var(--ocean)" stroke="var(--border)" vectorEffect="non-scaling-stroke" />
-          <path d={graticulePath} fill="none" stroke="var(--border)" strokeOpacity={0.6} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+          <path d={spherePath} fill="var(--ocean)" stroke="var(--border)" vectorEffect="non-scaling-stroke" onMouseMove={() => setHover(null)} />
+          <path d={graticulePath} pointerEvents="none" fill="none" stroke="var(--border)" strokeOpacity={0.6} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
           <Countries
             hoverName={hover?.kind === 'country' ? hover.name : null}
             countryColor={countryColor}
@@ -170,7 +170,7 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
         <MapBtn label="Zoom out" onClick={() => zoomBy(1 / 1.6)}><Minus size={14} /></MapBtn>
         <MapBtn label="Reset view" onClick={reset}><RotateCcw size={13} /></MapBtn>
       </div>
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-[var(--surface)]/85 px-2 py-1 text-[11px] text-[var(--muted)] backdrop-blur">
+      <div className="pointer-events-none absolute bottom-2 left-2 hidden rounded-md sm:block bg-[var(--surface)]/85 px-2 py-1 text-[11px] text-[var(--muted)] backdrop-blur">
         {showAllMarkers ? 'Click a dot to add that zone' : 'Click a country · scroll or pinch to zoom for cities'}
       </div>
 
@@ -226,8 +226,9 @@ function MapBtn({ label, onClick, children }: { label: string; onClick: () => vo
  * A box placed next to the pointer and kept inside the map: flips to the other side when it
  * would overflow, then clamps on both axes. Measured before paint, so there is no jump.
  */
-function Floating({ x, y, wrap, className, role, children }: { x: number; y: number; wrap: RefObject<HTMLDivElement | null>; className: string; role?: string; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
+function Floating({ x, y, wrap, className, role, label, boxRef, children }: { x: number; y: number; wrap: RefObject<HTMLDivElement | null>; className: string; role?: string; label?: string; boxRef?: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  const ownRef = useRef<HTMLDivElement>(null)
+  const ref = boxRef ?? ownRef
   const [pos, setPos] = useState({ left: x + 14, top: y + 14, maxHeight: 288 })
   useLayoutEffect(() => {
     const el = ref.current, w = wrap.current
@@ -244,7 +245,7 @@ function Floating({ x, y, wrap, className, role, children }: { x: number; y: num
     if (left !== pos.left || top !== pos.top || maxHeight !== pos.maxHeight) setPos({ left, top, maxHeight })
   })
   return (
-    <div ref={ref} role={role} className={'absolute overflow-auto ' + className} style={pos}>
+    <div ref={ref} role={role} aria-label={label} className={'absolute overflow-auto ' + className} style={pos}>
       {children}
     </div>
   )
@@ -292,6 +293,9 @@ function ZoneLine({ zone, epochMs }: { zone: string; epochMs: number }) {
 
 function ZonePicker({ info, x, y, docked, wrap, epochMs, onPick, onClose }: { info: CountryInfo; x: number; y: number; docked: boolean; wrap: RefObject<HTMLDivElement | null>; epochMs: number; onPick: (z: string) => void; onClose: () => void }) {
   const groups = groupByOffset(info.zones, epochMs)
+  const boxRef = useRef<HTMLDivElement>(null)
+  // Move focus into the picker so keyboard and screen-reader users land on the choices.
+  useEffect(() => { boxRef.current?.querySelector<HTMLElement>('button[data-zone]')?.focus({ preventScroll: true }) }, [info])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -307,7 +311,7 @@ function ZonePicker({ info, x, y, docked, wrap, epochMs, onPick, onClose }: { in
         <div key={g.offset} className="py-1">
           <div className="px-1 text-[11px] font-medium text-[var(--muted)]">{formatOffset(g.offset)} · {formatTime(g.zones[0], epochMs)}</div>
           {g.zones.map((z) => (
-            <button key={z} onClick={() => onPick(z)} className="block w-full truncate rounded px-2 py-1 text-left hover:bg-[var(--surface-2)]">
+            <button key={z} data-zone={z} onClick={() => onPick(z)} className="block w-full truncate rounded px-2 py-1 text-left hover:bg-[var(--surface-2)]">
               {cityName(z)}
               {zoneGeoById.get(z)?.note && <span className="ml-1 text-xs text-[var(--muted)]">· {zoneGeoById.get(z)!.note}</span>}
             </button>
@@ -318,13 +322,13 @@ function ZonePicker({ info, x, y, docked, wrap, epochMs, onPick, onClose }: { in
   )
   if (docked) {
     return (
-      <div role="dialog" aria-label={`Choose a time zone in ${info.name}`} className="mt-2 max-h-80 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-sm">
+      <div ref={boxRef} role="dialog" aria-label={`Choose a time zone in ${info.name}`} className="mt-2 max-h-80 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-sm">
         {content}
       </div>
     )
   }
   return (
-    <Floating x={x} y={y} wrap={wrap} role="dialog" className="z-20 w-64 max-w-[calc(100%-16px)] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-xl">
+    <Floating x={x} y={y} wrap={wrap} boxRef={boxRef} role="dialog" label={`Choose a time zone in ${info.name}`} className="z-20 w-64 max-w-[calc(100%-16px)] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-xl">
       {content}
     </Floating>
   )

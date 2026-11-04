@@ -9,7 +9,7 @@ import { ZoneStrip } from './components/ZoneStrip'
 import { canonicalZone, cleanZones, zoneLabel, zoneOptions } from './data/catalog'
 import { isBoolean, isStringArray } from '../../services/storage'
 import { utcMs } from '../../lib/dates'
-import { parseDateTime } from './logic/parse'
+import { MAX_YEAR, parseDateTime } from './logic/parse'
 import { colorFor } from './logic/colors'
 import { abbreviation, dayShift, formatDate, formatDiff, formatOffset, formatTime, isValidZone, localZone, offsetMinutes, wallTimeToEpoch, zonedParts } from './logic/tz'
 
@@ -25,7 +25,9 @@ export default function TimezonesPage() {
   /** null = live "now"; otherwise a pinned instant. */
   const [pinned, setPinned] = useState<number | null>(null)
   const ref = pinned ?? now
-  const options = useMemo(() => zoneOptions(Date.now()), [])
+  // Offsets in the search list are refreshed hourly (DST can change while the page is open).
+  const hour = Math.floor(now / 3_600_000)
+  const options = useMemo(() => zoneOptions(hour * 3_600_000), [hour])
 
   const addZone = useCallback((z: string) => setZones((zs) => cleanZones([...zs, canonicalZone(z)], MAX_ZONES)), [setZones])
   const removeZone = (z: string) => setZones((zs) => cleanZones(zs, MAX_ZONES).filter((x) => x !== z))
@@ -79,7 +81,7 @@ function TimeCursor({ now, pinned, setPinned }: { now: number; pinned: number | 
   const offsetMin = pinned == null ? 0 : Math.round((pinned - base) / 60000)
   return (
     <div className="flex items-end gap-3 sm:w-80">
-      <Field label={pinned == null ? 'Time: now (live)' : `Time: ${formatDiff(offsetMin).replace('same time', 'now')} from now`} className="flex-1">
+      <Field label={pinned == null ? 'Time: now (live)' : `Time: pinned, ${relativeLabel(pinned - now)}`} className="flex-1">
         <input
           type="range"
           min={-24 * 60}
@@ -92,6 +94,7 @@ function TimeCursor({ now, pinned, setPinned }: { now: number; pinned: number | 
           }}
           className="h-10 w-full accent-[var(--accent)]"
           aria-label="Shift time"
+          aria-valuetext={pinned == null ? 'now' : relativeLabel(pinned - now)}
         />
       </Field>
       <button
@@ -133,7 +136,7 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
                   <span className="truncate">{zoneLabel(z)}</span>
                 </div>
                 <div className="truncate text-xs text-[var(--muted)]">
-                  {abbreviation(z, refTime)} · {formatOffset(offsetMinutes(z, refTime))}
+                  {zoneMeta(z, refTime)}
                   {i > 0 && <> · {formatDiff(offsetMinutes(z, refTime) - homeOffset)}</>}
                 </div>
               </div>
@@ -178,14 +181,14 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
   onShowCompare: (t: number) => void
 }) {
   const [u, set] = useUrlState({ from: '', date: '', time: '' })
-  const from = u.from && isValidZone(u.from) ? u.from : zones[0] ?? localZone()
+  const from = u.from && isValidZone(u.from) ? canonicalZone(u.from) : zones[0] ?? canonicalZone(localZone())
   const nowParts = zonedParts(from, Date.now())
   const pad = (n: number) => String(n).padStart(2, '0')
   const date = u.date || `${String(nowParts.year).padStart(4, '0')}-${pad(nowParts.month)}-${pad(nowParts.day)}`
   const time = u.time || `${pad(nowParts.hour)}:${pad(nowParts.minute)}`
   const parsed = parseDateTime(date, time)
   const t = parsed ? wallTimeToEpoch(from, parsed.y, parsed.mo, parsed.d, parsed.h, parsed.mi) : NaN
-  const valid = parsed != null && Number.isFinite(t) && Math.abs(t) < 8.6e15
+  const valid = parsed != null && Number.isFinite(t)
   const back = valid ? zonedParts(from, t) : null
   const shifted = valid && back && (back.hour !== parsed.h || back.minute !== parsed.mi)
   const targets = zones.filter((z) => z !== from)
@@ -202,7 +205,7 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
             <Field label="Time"><Input type="time" value={time} onChange={(e) => set({ time: e.target.value })} /></Field>
           </div>
           <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-            <span className={valid ? '' : 'text-red-500'}>{valid ? `${abbreviation(from, t)} · ${formatOffset(offsetMinutes(from, t))}` : 'Enter a valid date (years 1–275000) and time'}</span>
+            <span className={valid ? '' : 'text-red-500'}>{valid ? zoneMeta(from, t) : `Enter a valid date (years 1–${MAX_YEAR.toLocaleString()}) and time`}</span>
             <button onClick={() => set({ date: '', time: '' })} className="text-[var(--accent)] hover:underline">Use current time</button>
           </div>
           {shifted && (
@@ -231,7 +234,7 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
                 <li key={z} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{zoneLabel(z)}</div>
-                    <div className="text-xs text-[var(--muted)]">{abbreviation(z, t)} · {formatDiff(offsetMinutes(z, t) - offsetMinutes(from, t))}</div>
+                    <div className="text-xs text-[var(--muted)]">{shortAbbr(z, t) && `${shortAbbr(z, t)} · `}{formatDiff(offsetMinutes(z, t) - offsetMinutes(from, t))}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-semibold tabular">{formatTime(z, t, hour12)}</div>
@@ -255,3 +258,24 @@ function formatDayShift(shift: number) {
   return `${shift > 0 ? '+' : '−'}${n} day${n === 1 ? '' : 's'}`
 }
 
+
+/** "3h 15m ahead", "45m behind", "now"; days beyond 48 hours. */
+function relativeLabel(ms: number) {
+  const min = Math.round(ms / 60000)
+  if (min === 0) return 'now'
+  const dir = min > 0 ? 'ahead' : 'behind'
+  const a = Math.abs(min)
+  if (a >= 48 * 60) return `${Math.round(a / 1440).toLocaleString()} days ${dir}`
+  return `${formatDiff(a).slice(1)} ${dir}`
+}
+
+/** Abbreviation only when it adds information ("EST", "CET"), not "GMT+5:30" next to "UTC+5:30". */
+function shortAbbr(zone: string, t: number) {
+  const a = abbreviation(zone, t)
+  return /^(GMT|UTC)([+−-]|$)/.test(a) ? '' : a
+}
+
+function zoneMeta(zone: string, t: number) {
+  const a = shortAbbr(zone, t)
+  return (a ? a + ' · ' : '') + formatOffset(offsetMinutes(zone, t))
+}

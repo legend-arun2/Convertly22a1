@@ -1,0 +1,9 @@
+# Changes to build, deploy and security configuration need the owner's review.
+/.github/         @legend-arun2
+/vite.config.ts   @legend-arun2
+/csp.config.ts    @legend-arun2
+/vercel.json      @legend-arun2
+/package.json     @legend-arun2
+/package-lock.json @legend-arun2
+/scripts/         @legend-arun2
+/public/theme.js  @legend-arun2

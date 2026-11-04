@@ -106,3 +106,68 @@ describe('storage validators', () => {
     expect(isBoolean('yes')).toBe(false)
   })
 })
+
+// ---------- Round 2 ----------
+import { copyText } from './lib/format'
+import { searchTools } from './tools/registry'
+import { MAX_YEAR } from './tools/timezones/logic/parse'
+
+describe('round 2: number parsing', () => {
+  it('handles edge cases strictly', () => {
+    const cases: [string, number][] = [
+      ['1,234,5', NaN], ['1.234.567', 1234567], ['1.234.567,89', 1234567.89], ['1,000e3', 1e6],
+      ['−5', -5], ['1e400', NaN], ['+5', 5], ['.5', 0.5], ['5.', 5], ['1e', NaN], ['-', NaN],
+      ['1,2345', 1.2345], ['1,23,456', NaN], ['1..2', NaN],
+    ]
+    for (const [input, want] of cases) {
+      const got = parseNumber(input)
+      if (Number.isNaN(want)) expect(got, input).toBeNaN()
+      else expect(got, input).toBe(want)
+    }
+  })
+  it('is linear-time on long hostile input (no ReDoS) and capped in length', () => {
+    const t = performance.now()
+    expect(parseNumber('1'.repeat(99) + 'x')).toBeNaN()
+    expect(parseNumber('1'.repeat(1_000_000) + 'x')).toBeNaN()
+    expect(performance.now() - t).toBeLessThan(100)
+  })
+})
+
+describe('round 2: number formatting', () => {
+  it('shows exact integers', () => {
+    expect(formatNumber(1_099_511_627_776)).toBe('1,099,511,627,776')
+    expect(formatNumber(123_456_789_012)).toBe('123,456,789,012')
+    expect(formatNumber(-42)).toBe('-42')
+  })
+  it('copies full precision without separators', () => {
+    expect(copyText(1_099_511_627_776)).toBe('1099511627776')
+    expect(copyText(0.1 + 0.2)).toBe('0.3')
+    expect(copyText(Infinity)).toBe('')
+  })
+})
+
+describe('round 2: home search', () => {
+  const ids = (q: string) => searchTools(q).map((t) => t.id)
+  it('matches phrases by any meaningful word', () => {
+    expect(ids('kg to lb')).toContain('units')
+    expect(ids('km to miles')).toContain('units')
+    expect(ids('inches')).toContain('units')
+    expect(ids('Tokyo')).toContain('timezones')
+    expect(ids('EST to PST')).toContain('timezones')
+    expect(ids('500 BC')).toContain('calendar')
+    expect(ids('zzzz')).toEqual([])
+    expect(ids('')).toHaveLength(3)
+  })
+})
+
+describe('round 2: convert year limit', () => {
+  it('accepts up to MAX_YEAR and every accepted date converts', () => {
+    const p = parseDateTime(`${MAX_YEAR}-12-31`, '23:59')!
+    expect(p).not.toBeNull()
+    expect(Number.isFinite(wallTimeToEpoch('Pacific/Kiritimati', p.y, p.mo, p.d, p.h, p.mi))).toBe(true)
+    expect(parseDateTime(`${MAX_YEAR + 1}-01-01`, '00:00')).toBeNull()
+  })
+  it('canonicalises a lowercase or legacy "from" zone', () => {
+    expect(canonicalZone('Asia/Calcutta')).toBe('Asia/Kolkata')
+  })
+})

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ArrowRight, Search } from 'lucide-react'
 import { searchTools } from '../tools/registry'
 

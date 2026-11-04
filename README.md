@@ -11,10 +11,11 @@ Every conversion is stored in the URL, so you can share a link to it.
 ## Development
 
 ```bash
-npm install
+npm ci           # installs exactly the locked versions (install scripts are disabled in .npmrc)
 npm run dev        # http://localhost:5173
 npm test           # unit tests (Vitest)
-npm run build      # type-check + production build into dist/
+npm run lint       # type-check
+npm run build      # type-check + production build into dist/ (fails if the CSP is missing)
 ```
 
 ## Project structure
@@ -55,10 +56,31 @@ The conversions themselves use the browser's built-in `Intl` API, which ships an
 
 ## Security
 
-- Production builds include a strict Content-Security-Policy (`vite.config.ts`). The Vercel config also sends it as an HTTP header, with `frame-ancestors 'none'`.
-- No source maps are shipped. URL parameters and stored data are validated, and crashes are contained by an error boundary.
-- CI uses least-privilege permissions, SHA-pinned actions and `npm ci --ignore-scripts`. Dependabot keeps actions and npm packages up to date.
-- Before adding accounts, move to a dedicated domain (e.g. Vercel). On `*.github.io`, browser storage is shared with the owner's other Pages sites.
+- **CSP:** production builds include a strict Content-Security-Policy with Trusted Types: no inline scripts, nothing external. The single source is `csp.config.ts`. The build fails if the policy is missing, and the Vercel config sends the same policy as a header (plus `frame-ancestors 'none'`, HSTS, COOP/CORP/COEP and others). A test keeps the two in sync.
+- **Untrusted input:** URL parameters and stored data are length-capped and validated. Parsers are linear-time, and crashes are contained by an error boundary. No source maps are shipped and nothing is sent off-device.
+- **CI:**
+  - Pull requests run `ci.yml`, which type-checks, tests and builds.
+  - Both workflows use least-privilege permissions and SHA-pinned actions.
+  - Installs run `npm ci --ignore-scripts` followed by `npm audit signatures`, with no dependency cache in the release pipeline.
+  - Dependabot updates actions and npm packages weekly, with a 7-day cooldown on new releases.
+
+**Recommended repository settings:**
+- Protect `main` with a ruleset:
+  - require a pull request with review, including from Code Owners;
+  - require the `CI / test` check;
+  - block force pushes and deletions.
+- Limit the `github-pages` environment to the `main` branch.
+- Under Actions settings:
+  - set the default `GITHUB_TOKEN` to read-only;
+  - stop Actions from creating or approving pull requests;
+  - allow only GitHub-authored actions.
+- Turn on secret scanning with push protection, Dependabot alerts, private vulnerability reporting and (optionally) CodeQL.
+
+**Limits of GitHub Pages:**
+- `<user>.github.io` is one origin shared by all of that user's Pages sites, so they can read this site's storage or script it.
+- Pages cannot send security headers, so the CSP comes only from the `<meta>` tag, and clickjacking protection isn't available.
+
+Use a custom domain or Vercel before adding accounts or anything sensitive.
 
 ## Deployment
 

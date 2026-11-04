@@ -8,6 +8,6 @@ export const unitsTool: ToolDefinition = {
   description: 'Length, mass, volume, temperature and more. Compare metric with imperial and US units.',
   path: 'units',
   icon: Ruler,
-  keywords: ['cm to m', 'meter', 'inch', 'feet', 'kg', 'pound', 'celsius', 'fahrenheit', 'metric', 'imperial', 'liter', 'gallon', 'mph'],
+  keywords: ['cm to m', 'unit', 'length', 'distance', 'weight', 'mass', 'volume', 'temperature', 'speed', 'area', 'pressure', 'energy', 'data', 'meter', 'metre', 'mm', 'cm', 'km', 'inch', 'foot', 'feet', 'yard', 'mile', 'kg', 'gram', 'lb', 'pound', 'ounce', 'oz', 'stone', 'ton', 'celsius', 'fahrenheit', 'kelvin', '°c', '°f', 'metric', 'imperial', 'liter', 'litre', 'ml', 'gallon', 'cup', 'pint', 'mph', 'km/h', 'knot', 'acre', 'hectare', 'psi', 'bar', 'calorie', 'joule', 'kwh', 'byte', 'gb', 'mb', 'gib'],
   component: lazy(() => import('./UnitsPage')),
 }

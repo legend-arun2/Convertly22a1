@@ -5,12 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+npm ci                                        # install (.npmrc disables install scripts; Node per .nvmrc)
 npm run dev                                   # Vite dev server (http://localhost:5173)
 npm test                                      # all unit tests (Vitest, node environment)
 npx vitest run src/tools/calendar             # tests under one folder
 npx vitest run -t "no year 0"                 # tests whose name matches
 npm run lint                                  # type-check only (tsc -b --noEmit); there is no ESLint
-npm run build                                 # tsc + vite build + scripts/postbuild.mjs (writes dist/404.html, .nojekyll)
+npm run build                                 # tsc + vite build + scripts/postbuild.mjs (fails if the CSP meta is missing; writes dist/404.html)
 VITE_BASE=/convertly/ npm run build           # build for a GitHub Pages sub-path
 VITE_BASE=/convertly/ npx vite preview        # preview MUST get the same VITE_BASE, or assets 404
 npm run gen:tz                                # regenerate src/tools/timezones/data/geo.json
@@ -23,7 +24,7 @@ Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). For UI checks, P
 **Tool registry.** Every feature is a "tool": `src/tools/<id>/index.ts` exports a `ToolDefinition` (`src/tools/types.ts`) with a `lazy()` page component. `src/tools/registry.ts` is the single list. The nav (`app/Layout.tsx`), routes (`app/App.tsx`), home grid and search (`app/Home.tsx`) are all generated from it. To add a tool, create the folder and add one line to the registry. Each tool keeps pure, React-free logic in `logic/` with co-located tests, and data in `data/`.
 
 **State.**
-- **Shareable state** lives in the URL via `lib/useUrlState.ts`. A value equal to its default is removed from the query string, so use empty-string defaults for anything that must survive sharing (the calendar date uses `''` to mean "today, resolved at render").
+- **Shareable state** lives in the URL via `lib/useUrlState.ts`. `<BrowserRouter useTransitions={false}>` in `app/App.tsx` is required: with transitions on, URL-bound inputs drop keystrokes and lose the caret. Import routing from `react-router` (not `react-router-dom`). A value equal to its default is removed from the query string, so use empty-string defaults for anything that must survive sharing (the calendar date uses `''` to mean "today, resolved at render").
 - **Persistent state** goes through `services/storage.ts` / `lib/usePersistentState.ts`. Every read requires a validator, because localStorage is untrusted (on `*.github.io` it is shared with other Pages sites). Swap in a backend by implementing `StorageService`.
 - `services/http.ts` is the only sanctioned fetch path (host allow-list, timeout, response validator). It is not used yet.
 
@@ -53,5 +54,6 @@ Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). For UI checks, P
 ## Deployment and security constraints
 
 - **Hosting:** GitHub Pages now (`.github/workflows/deploy.yml`, built with `VITE_BASE=/<repo>/`), Vercel later (`vercel.json` already has the SPA rewrite and security headers; leave `VITE_BASE` unset). App code must not hard-code `/` paths: use `import.meta.env.BASE_URL`, or reference `public/` files from `index.html` with an absolute `/…` path so Vite prefixes the base.
-- **CSP:** production builds inject a strict Content-Security-Policy meta tag (`vite.config.ts`, mirrored in `vercel.json`). It allows no inline scripts, which is why the theme bootstrap lives in `public/theme.js`. When adding an external API host, update `connect-src` in both files and `ALLOWED_HOSTS` in `services/http.ts`. Anything in `VITE_*` env vars ends up in the public bundle.
-- **CI:** actions are pinned to commit SHAs (Dependabot updates them), and installs use `npm ci --ignore-scripts`. Keep `pages: write` / `id-token: write` on the deploy job only.
+- **CSP:** `csp.config.ts` is the single source. `vite.config.ts` injects it as a meta tag in production, and `vercel.json` must carry the same value plus `frame-ancestors 'none'` (`src/security.test.ts` enforces this). The policy uses `default-src 'none'` and Trusted Types, so it forbids inline scripts, `innerHTML`/`dangerouslySetInnerHTML`, `data:` images and external hosts. That is why the theme bootstrap lives in `public/theme.js`. When adding an API host, update `connect-src` and `ALLOWED_HOSTS` in `services/http.ts`. Anything in `VITE_*` env vars ends up in the public bundle.
+- **Untrusted input:** user-facing parsers must be linear-time (no nested quantifiers) and length-capped. `useUrlState` ignores values over 256 characters, and `parseNumber` rejects input over 100 characters.
+- **CI:** `ci.yml` checks PRs and non-main branches; `deploy.yml` deploys `main`, getting the base path from `actions/configure-pages`. Actions are pinned to commit SHAs with exact version comments (Dependabot updates them, with a 7-day cooldown). Installs use `npm ci --ignore-scripts` followed by `npm audit signatures`, and there is no dependency cache. Keep `pages: write` / `id-token: write` on the deploy job only. In this sandbox, `npm audit signatures` fails with a 403 because the proxy blocks Sigstore; it works on GitHub runners.

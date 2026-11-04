@@ -112,7 +112,7 @@ export function CopyButton({ text }: { text: string }) {
         navigator.clipboard?.writeText(text).then(() => {
           setDone(true)
           setTimeout(() => setDone(false), 1200)
-        })
+        }).catch(() => { /* clipboard permission denied: nothing to do */ })
       }}
       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
     >
@@ -156,7 +156,12 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
   const pick = (v: string) => { onChange(v); setOpen(false); setQuery('') }
 
   return (
-    <div ref={ref} className="relative min-w-0">
+    <div
+      ref={ref}
+      className="relative min-w-0"
+      // Close when focus leaves the widget (e.g. Tab), not only on outside clicks.
+      onBlur={(e) => { if (!ref.current?.contains(e.relatedTarget as Node | null)) setOpen(false) }}
+    >
       <div className="relative">
         <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
         <input

@@ -1,6 +1,7 @@
 import { CalendarDays, Info } from 'lucide-react'
 import { Card, CopyButton, Field, Input, PageHeader, Segmented, Select } from '../../components/ui'
 import { useUrlState } from '../../lib/useUrlState'
+import { useNow } from '../../lib/useNow'
 import { calendars, getInputCalendar, inputCalendars, normalize, weekday } from './logic/calendars'
 import { fixedFromGregorian, gregorianFromFixed, jdnFromFixed } from './logic/gregorianJulian'
 import { fromAstronomical, formatEraYear, isoYear, toAstronomical, type Era, type Notation } from './logic/era'
@@ -13,6 +14,7 @@ function today() {
 export default function CalendarPage() {
   // Empty defaults mean "today" (resolved at render), so shared links always carry the full date
   // the sender picked, and an untouched page never shows a stale day after midnight.
+  useNow(60_000) // re-render each minute so an untouched "today" rolls over at midnight
   const t = today()
   const [s, set] = useUrlState({ cal: 'gregorian', era: 'AD', y: '', m: '', d: '', n: 'ADBC' })
   const cal = getInputCalendar(s.cal)
@@ -30,7 +32,8 @@ export default function CalendarPage() {
     monthNum = v.month
     dayNum = v.day
   }
-  const yearNum = yearStr.trim() === '' ? NaN : Number(yearStr)
+  // Plain decimal digits only (Number() would also accept "1e3" or "0x10").
+  const yearNum = (cal.usesEra ? /^\d{1,6}$/ : /^-?\d{1,6}$/).test(yearStr.trim()) ? Number(yearStr) : NaN
   const yearValid = Number.isInteger(yearNum) && (cal.usesEra ? yearNum >= 1 : true) && Math.abs(yearNum) < 1_000_000
   const astroYear = yearValid ? (cal.usesEra ? toAstronomical(yearNum, inputEra) : yearNum) : NaN
   const ymd = yearValid ? normalize(cal, { year: astroYear, month: monthNum, day: dayNum }) : null
@@ -75,7 +78,7 @@ export default function CalendarPage() {
             <Field label="Calendar">
               <Select
                 value={cal.id}
-                onChange={(e) => (fixed != null ? setFromFixed(e.target.value, fixed) : set({ cal: e.target.value }))}
+                onChange={(e) => (fixed != null ? setFromFixed(e.target.value, fixed) : set({ cal: e.target.value, era: 'AD', y: '', m: '', d: '' }))}
                 options={inputCalendars.map((c) => ({ value: c.id, label: c.name }))}
               />
             </Field>

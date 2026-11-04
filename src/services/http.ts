@@ -12,6 +12,9 @@ export const ALLOWED_HOSTS = new Set<string>([
 ])
 
 const MAX_ENTRIES = 50
+const MAX_BYTES = 1_000_000 // refuse responses larger than 1 MB
+const MAX_STALE_MS = 24 * 3_600_000 // serve cached data after an error for at most a day
+const JSON_TYPE = /^application\/(?:[\w.+-]+\+)?json\b/i
 const cache = new Map<string, { at: number; data: unknown }>()
 
 export class HttpError extends Error {}
@@ -22,7 +25,7 @@ export async function getJson<T>(
   { maxAgeMs = 10 * 60_000, timeoutMs = 10_000 }: { maxAgeMs?: number; timeoutMs?: number } = {},
 ): Promise<T> {
   const u = new URL(url, location.origin)
-  if (u.origin !== location.origin && (u.protocol !== 'https:' || !ALLOWED_HOSTS.has(u.hostname))) {
+  if (u.origin !== location.origin && (u.protocol !== 'https:' || u.port !== '' || u.username || u.password || !ALLOWED_HOSTS.has(u.hostname))) {
     throw new HttpError(`Host not allowed: ${u.hostname}`)
   }
   const key = u.toString()
@@ -33,17 +36,26 @@ export async function getJson<T>(
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   const safeUrl = u.origin + u.pathname // never echo query strings (may contain keys) in errors
   try {
-    const res = await fetch(key, { credentials: 'omit', signal: ctrl.signal, headers: { Accept: 'application/json' } })
+    const res = await fetch(key, {
+      credentials: 'omit',
+      redirect: 'error', // a redirect could leave the allow-list
+      referrerPolicy: 'no-referrer',
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json' },
+    })
     if (!res.ok) throw new HttpError(`Request failed (${res.status}): ${safeUrl}`)
-    if (!res.headers.get('content-type')?.includes('json')) throw new HttpError(`Unexpected content type: ${safeUrl}`)
-    const data: unknown = await res.json()
+    if (!JSON_TYPE.test(res.headers.get('content-type') ?? '')) throw new HttpError(`Unexpected content type: ${safeUrl}`)
+    if (Number(res.headers.get('content-length') ?? 0) > MAX_BYTES) throw new HttpError(`Response too large: ${safeUrl}`)
+    const text = await res.text()
+    if (text.length > MAX_BYTES) throw new HttpError(`Response too large: ${safeUrl}`)
+    const data: unknown = JSON.parse(text)
     if (!validate(data)) throw new HttpError(`Unexpected response shape: ${safeUrl}`)
     if (cache.size >= MAX_ENTRIES) cache.delete(cache.keys().next().value!)
     cache.set(key, { at: Date.now(), data })
     return structuredClone(data)
   } catch (e) {
     // Serve stale data if we have it rather than failing outright.
-    if (hit) return structuredClone(hit.data) as T
+    if (hit && Date.now() - hit.at < MAX_STALE_MS) return structuredClone(hit.data) as T
     if (e instanceof DOMException && e.name === 'AbortError') throw new HttpError(`Request timed out: ${safeUrl}`)
     throw e
   } finally {

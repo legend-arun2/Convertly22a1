@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Card, CopyButton, Field, Input, PageHeader, Segmented, Select, SwapButton } from '../../components/ui'
 import { useUrlState } from '../../lib/useUrlState'
-import { formatNumber } from '../../lib/format'
+import { copyText, formatNumber } from '../../lib/format'
 import { categories, comparisons, references } from './data/units'
-import { belowMinimum, convert, findUnit, parseNumber } from './logic/convert'
+import { belowMinimum, convert, findUnit, MAX_NUMBER_INPUT, parseNumber } from './logic/convert'
 import type { Category } from './logic/types'
 
 export default function UnitsPage() {
@@ -47,7 +47,7 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
         <Card>
           <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto_1fr]">
             <Field label="Value">
-              <Input inputMode="decimal" value={s.v} onChange={(e) => set({ v: e.target.value })} aria-invalid={Number.isNaN(value)} />
+              <Input inputMode="decimal" maxLength={MAX_NUMBER_INPUT} value={s.v} onChange={(e) => set({ v: e.target.value })} aria-invalid={Number.isNaN(value)} />
             </Field>
             <Field label="From">
               <Select value={from} onChange={(e) => set({ from: e.target.value })} options={options} />
@@ -70,7 +70,7 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
                 </>
               )}
             </p>
-            {!Number.isNaN(result) && <CopyButton text={formatNumber(result)} />}
+            {Number.isFinite(result) && <CopyButton text={copyText(result)} />}
           </div>
         </Card>
       </div>
