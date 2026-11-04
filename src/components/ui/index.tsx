@@ -1,13 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type SelectHTMLAttributes, type InputHTMLAttributes } from 'react'
 import { ArrowLeftRight, Check, Copy, Search } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { tools } from '../../tools/registry'
+import { accentClasses } from '../../tools/accents'
 
 export function Card({ children, className, title, actions }: { children: ReactNode; className?: string; title?: ReactNode; actions?: ReactNode }) {
   return (
-    <section className={cn('rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5', className)}>
+    <section className={cn('rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-md)] sm:p-6', className)}>
       {(title || actions) && (
-        <div className="mb-4 flex items-center justify-between gap-3">
-          {title && <h2 className="text-sm font-semibold">{title}</h2>}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          {title && <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">{title}</h2>}
           {actions}
         </div>
       )}
@@ -27,7 +29,7 @@ export function Field({ label, children, className, hint }: { label: string; chi
 }
 
 const control =
-  'h-10 w-full min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20'
+  'h-11 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[15px] shadow-[var(--shadow-sm)] outline-none transition hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/15 focus-visible:outline-none'
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(control, 'tabular', props.className)} />
@@ -60,7 +62,7 @@ export function Select({ options, ...props }: SelectHTMLAttributes<HTMLSelectEle
 
 export function Segmented<T extends string>({ value, onChange, options, className }: { value: T; onChange: (v: T) => void; options: { value: T; label: ReactNode }[]; className?: string }) {
   return (
-    <div role="tablist" className={cn('flex gap-1 overflow-x-auto rounded-xl bg-[var(--surface-2)] p-1', className)}>
+    <div role="tablist" className={cn('flex gap-1 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-1', className)}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -68,8 +70,10 @@ export function Segmented<T extends string>({ value, onChange, options, classNam
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition',
-            o.value === value ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]',
+            'shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-medium transition',
+            o.value === value
+              ? 'bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-sm)] ring-1 ring-[var(--border)]'
+              : 'text-[var(--muted)] hover:bg-[var(--surface)]/60 hover:text-[var(--text)]',
           )}
         >
           {o.label}
@@ -86,7 +90,7 @@ export function IconButton({ label, onClick, children, className }: { label: str
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn('inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text)]', className)}
+      className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] shadow-[var(--shadow-sm)] transition hover:border-[var(--border-strong)] hover:text-[var(--accent)] active:scale-95', className)}
     >
       {children}
     </button>
@@ -186,7 +190,7 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
         />
       </div>
       {open && (
-        <ul id={listId} role="listbox" className="absolute z-30 mt-1 max-h-72 w-full min-w-64 overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg">
+        <ul id={listId} role="listbox" className="absolute z-30 mt-1.5 max-h-72 w-full min-w-64 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-lg)]">
           {filtered.length === 0 && <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches</li>}
           {filtered.map((o, i) => (
             <li
@@ -196,7 +200,7 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
               aria-selected={o.value === value}
               onMouseDown={(e) => { e.preventDefault(); pick(o.value) }}
               onMouseEnter={() => setActive(i)}
-              className={cn('flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-sm', i === active && 'bg-[var(--surface-2)]')}
+              className={cn('flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm', i === active && 'bg-[var(--accent-soft)] text-[var(--text)]')}
             >
               <span className="truncate">{o.label}</span>
               {o.detail && <span className="shrink-0 text-xs text-[var(--muted)] tabular">{o.detail}</span>}
@@ -208,11 +212,20 @@ export function Combobox({ value, onChange, options, placeholder, label }: {
   )
 }
 
-export function PageHeader({ title, description }: { title: string; description: string }) {
+export function PageHeader({ title, description, toolId }: { title: string; description: string; toolId?: string }) {
+  const tool = toolId ? tools.find((t) => t.id === toolId) : undefined
+  const accent = tool ? accentClasses[tool.accent] : null
   return (
-    <div className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
+    <div className="mb-7 flex items-start gap-4">
+      {tool && accent && (
+        <span className={cn('mt-0.5 hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 sm:inline-flex', accent.badge)}>
+          <tool.icon size={22} strokeWidth={1.75} />
+        </span>
+      )}
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">{title}</h1>
+        <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-[var(--muted)]">{description}</p>
+      </div>
     </div>
   )
 }

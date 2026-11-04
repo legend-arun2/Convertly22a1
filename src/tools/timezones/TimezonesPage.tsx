@@ -36,7 +36,7 @@ export default function TimezonesPage() {
 
   return (
     <div>
-      <PageHeader title="Time zones" description="Compare time zones on a live world map, or convert a time from one zone to others." />
+      <PageHeader toolId="timezones" title="Time zones" description="Compare time zones on a live world map, or convert a time from one zone to others." />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Segmented
           value={s.view as 'compare' | 'convert'}
@@ -123,13 +123,13 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
   const homeOffset = offsetMinutes(home, refTime)
 
   return (
-    <ul className="flex flex-col gap-3" data-testid="zone-list">
+    <ul className="flex flex-col gap-1" data-testid="zone-list">
       {zones.map((z, i) => {
         const shift = dayShift(z, home, refTime)
         return (
-          <li key={z} className="flex flex-col gap-2 border-b border-[var(--border)] pb-3 last:border-0 lg:flex-row lg:items-center lg:gap-4">
+          <li key={z} className="-mx-2 flex flex-col gap-2.5 rounded-xl px-2 py-2.5 transition hover:bg-[var(--surface-2)]/60 lg:flex-row lg:items-center lg:gap-4">
             <div className="flex min-w-0 items-center gap-3 lg:w-80 lg:shrink-0">
-              <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ background: colorFor(i) }} />
+              <span className="h-9 w-1.5 shrink-0 rounded-full shadow-[var(--shadow-sm)]" style={{ background: colorFor(i) }} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 truncate text-sm font-medium">
                   {i === 0 && <Home size={12} className="shrink-0 text-[var(--accent)]" aria-label="Home zone" />}
@@ -141,7 +141,7 @@ function ZoneList({ zones, refTime, hour12, onRemove, onHome, onPick }: {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-semibold tabular leading-tight">{formatTime(z, refTime, hour12)}</div>
+                <div className="text-xl font-semibold tracking-tight tabular leading-tight">{formatTime(z, refTime, hour12)}</div>
                 <div className="text-xs text-[var(--muted)]">
                   {formatDate(z, refTime)}
                   {shift !== 0 && <span className="ml-1 font-medium text-[var(--accent)]">{formatDayShift(shift)}</span>}
@@ -231,7 +231,7 @@ function ConvertView({ zones, options, hour12, onAdd, onShowCompare }: {
             {targets.map((z) => {
               const shift = dayShift(z, from, t)
               return (
-                <li key={z} className="flex items-center gap-3 py-3">
+                <li key={z} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-2)]/60">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{zoneLabel(z)}</div>
                     <div className="text-xs text-[var(--muted)]">{shortAbbr(z, t) && `${shortAbbr(z, t)} · `}{formatDiff(offsetMinutes(z, t) - offsetMinutes(from, t))}</div>

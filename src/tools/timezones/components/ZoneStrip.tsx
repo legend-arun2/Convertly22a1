@@ -47,9 +47,9 @@ export function ZoneStrip({ zone, dayStart, hours, cursorIndex, onPick }: { zone
           aria-current={i === cursorIndex ? 'time' : undefined}
           title={`${DAYS[p.weekday]} ${pad(p.hour)}:${pad(p.minute)}`}
           className={cn(
-            'relative flex h-9 min-w-0 flex-1 flex-col items-center justify-center rounded-[3px] text-[10px] leading-none tabular transition hover:ring-1 hover:ring-[var(--accent)] sm:text-[11px]',
+            'relative flex h-10 min-w-0 flex-1 flex-col items-center justify-center rounded-md text-[10px] font-medium leading-none tabular transition hover:ring-1 hover:ring-[var(--accent)] sm:text-[11px]',
             tone(p.hour),
-            i === cursorIndex && 'ring-2 ring-[var(--accent)] z-[1]',
+            i === cursorIndex && 'z-[1] bg-[var(--accent)]! text-[var(--accent-contrast)]! shadow-[var(--shadow-md)] ring-2 ring-[var(--accent)]',
             p.hour === 0 && 'border-l-2 border-[var(--text)]/40',
           )}
         >

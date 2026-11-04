@@ -61,7 +61,7 @@ export default function CalendarPage() {
 
   return (
     <div>
-      <PageHeader title="Calendar & era converter" description="Convert dates between AD/BC and CE/BCE, and across Gregorian, Julian, Islamic, Hebrew and other calendars." />
+      <PageHeader toolId="calendar" title="Calendar & era converter" description="Convert dates between AD/BC and CE/BCE, and across Gregorian, Julian, Islamic, Hebrew and other calendars." />
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <Card
           title="Enter a date"
@@ -108,10 +108,18 @@ export default function CalendarPage() {
             </div>
             {!yearValid && <p className="text-sm text-red-500">{cal.usesEra ? 'Enter a whole year of 1 or more. There is no year 0 in AD/BC.' : 'Enter a whole year.'}</p>}
             {cal.note && <p className="text-xs text-[var(--muted)]">{cal.note}</p>}
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
-              <span className="text-xs text-[var(--muted)]">Era notation</span>
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
+              <span className="text-xs font-medium text-[var(--muted)]">Era notation</span>
               <Segmented value={notation} onChange={(n) => set({ n })} options={[{ value: 'ADBC', label: 'AD / BC' }, { value: 'CEBCE', label: 'CE / BCE' }]} />
             </div>
+            <aside className="mt-1 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/60 p-4 text-sm leading-relaxed text-[var(--muted)]">
+              <p className="mb-1 font-semibold text-[var(--text)]">Good to know</p>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>There is <b className="text-[var(--text)]">no year 0</b>: 1 BC is followed directly by AD 1.</li>
+                <li><b className="text-[var(--text)]">CE/BCE</b> are the same years as AD/BC, just a neutral name.</li>
+                <li>Astronomers count 1 BC as year 0 and 2 BC as −1, which makes date maths easier.</li>
+              </ul>
+            </aside>
           </div>
         </Card>
 
@@ -120,16 +128,16 @@ export default function CalendarPage() {
 
       {fixed != null && (
         <Card title="Same day in every calendar" className="mt-4">
-          <ul className="divide-y divide-[var(--border)]">
+          <ul className="flex flex-col gap-0.5">
             {calendars.map((c) => {
               const text = c.format(fixed, notation)
               return (
-                <li key={c.id} className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                <li key={c.id} className={'-mx-2 flex flex-col gap-0.5 rounded-xl px-2 py-2.5 transition hover:bg-[var(--surface-2)]/70 sm:flex-row sm:items-center sm:gap-4' + (c.id === cal.id ? ' bg-amber-500/[0.07]' : '')}>
                   <span className="w-56 shrink-0 text-sm text-[var(--muted)]">
                     {c.name}
                     {c.note && <span title={c.note} className="ml-1 inline-flex align-middle"><Info size={12} /></span>}
                   </span>
-                  <span className={'flex-1 text-sm tabular' + (c.id === cal.id ? ' font-semibold' : '')}>{text}</span>
+                  <span className={'flex-1 text-[15px] tabular' + (c.id === cal.id ? ' font-semibold' : '')}>{text}</span>
                   <CopyButton text={text} />
                 </li>
               )
@@ -149,7 +157,7 @@ function Summary({ fixed, notation, currentYear }: { fixed: number; notation: No
   return (
     <Card title="Result">
       <p className="text-sm text-[var(--muted)]">{weekday(fixed)}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{calendars[0].format(fixed, notation)}</p>
+      <p className="mt-1 bg-gradient-to-br from-amber-600 to-orange-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent sm:text-4xl dark:from-amber-200 dark:to-orange-300">{calendars[0].format(fixed, notation)}</p>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {diff > 0 ? `${diff.toLocaleString()} year${diff === 1 ? '' : 's'} ago` : diff < 0 ? `in ${(-diff).toLocaleString()} year${diff === -1 ? '' : 's'}` : 'This year'}
       </p>
@@ -161,7 +169,7 @@ function Summary({ fixed, notation, currentYear }: { fixed: number; notation: No
         <Stat label="Julian Day Number" value={jdnFromFixed(fixed).toLocaleString()} />
       </dl>
       {beforeReform && (
-        <p className="mt-4 rounded-lg bg-[var(--accent-soft)] px-3 py-2 text-xs text-[var(--text)]">
+        <p className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-xs leading-relaxed text-[var(--text)]">
           Before 15 Oct 1582 historical sources usually give dates in the <b>Julian</b> calendar. The Gregorian date shown is projected backwards (proleptic).
         </p>
       )}
@@ -171,9 +179,9 @@ function Summary({ fixed, notation, currentYear }: { fixed: number; notation: No
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg bg-[var(--surface-2)] px-3 py-2">
-      <dt className="text-xs text-[var(--muted)]" title={hint}>{label}</dt>
-      <dd className="mt-0.5 font-medium tabular">{value}</dd>
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/60 px-3.5 py-2.5">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]" title={hint}>{label}</dt>
+      <dd className="mt-1 font-semibold tabular">{value}</dd>
     </div>
   )
 }

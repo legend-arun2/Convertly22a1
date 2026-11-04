@@ -10,7 +10,7 @@ export default function UnitsPage() {
   const [s, set] = useUrlState({ view: 'convert', cat: 'length', from: '', to: '', v: '1' })
   return (
     <div>
-      <PageHeader title="Unit converter" description="Convert length, mass, volume, temperature and more. Compare metric with imperial and US units." />
+      <PageHeader toolId="units" title="Unit converter" description="Convert length, mass, volume, temperature and more. Compare metric with imperial and US units." />
       <Segmented
         className="mb-5 w-fit"
         value={s.view as 'convert' | 'compare'}
@@ -40,6 +40,7 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-4">
         <Segmented
+          className="flex-wrap"
           value={cat.id}
           onChange={(id) => set({ cat: id, from: '', to: '' })}
           options={categories.map((c) => ({ value: c.id, label: c.name }))}
@@ -57,16 +58,16 @@ function ConvertView({ s, set }: { s: S; set: (p: Partial<S>) => void }) {
               <Select value={to} onChange={(e) => set({ to: e.target.value })} options={options} />
             </Field>
           </div>
-          <div className="mt-5 flex items-center gap-2 rounded-xl bg-[var(--surface-2)] px-4 py-4">
-            <p className="min-w-0 flex-1 break-words text-lg sm:text-2xl">
+          <div className="mt-6 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-transparent px-5 py-5">
+            <p className="min-w-0 flex-1 break-words text-xl sm:text-3xl">
               {Number.isNaN(value) ? (
                 <span className={'text-sm ' + (tooLow ? 'text-red-500' : 'text-[var(--muted)]')}>
                   {tooLow ? 'That is below absolute zero (0 K = −273.15 °C = −459.67 °F), which is physically impossible.' : 'Enter a number to convert.'}
                 </span>
               ) : (
                 <>
-                  <span className="text-[var(--muted)] tabular">{formatNumber(value)} {fromU.symbol} =</span>{' '}
-                  <span className="font-semibold tabular">{formatNumber(result)} {toU.symbol}</span>
+                  <span className="block text-sm font-medium text-[var(--muted)] tabular sm:text-base">{formatNumber(value)} {fromU.symbol} ({fromU.name}) =</span>
+                  <span className="font-semibold tracking-tight tabular">{formatNumber(result)} <span className="text-emerald-700 dark:text-emerald-300">{toU.symbol}</span></span>
                 </>
               )}
             </p>

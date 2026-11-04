@@ -9,6 +9,7 @@ export const CSP_DIRECTIVES = [
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self'",
+  "font-src 'self'",
   "connect-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",

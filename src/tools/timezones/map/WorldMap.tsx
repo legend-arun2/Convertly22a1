@@ -6,9 +6,9 @@ import { zoom as d3zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import { feature } from 'topojson-client'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { Topology, GeometryCollection } from 'topojson-specification'
-import { Minus, Plus, RotateCcw, X } from 'lucide-react'
+import { Minus, Moon, Plus, RotateCcw, Sun, X } from 'lucide-react'
 import world from 'world-atlas/countries-110m.json'
-import { antisolarPoint } from '../logic/solar'
+import { antisolarPoint, subsolarPoint } from '../logic/solar'
 import { formatOffset, formatTime, formatDate, cityName, offsetMinutes as offsetOf } from '../logic/tz'
 import { countryForFeature, countryName, groupByOffset, zoneGeo, zoneGeoById, type CountryInfo } from '../data/catalog'
 
@@ -63,9 +63,11 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
   const minute = Math.floor(epochMs / 60000)
   const night = useMemo(() => {
     const center = antisolarPoint(minute * 60000)
+    const sun = subsolarPoint(minute * 60000)
     return {
       twilight: path(geoCircle().center(center).radius(90)()) ?? '',
       dark: path(geoCircle().center(center).radius(82)()) ?? '',
+      sun: projection([sun.lon, sun.lat]),
     }
   }, [minute])
 
@@ -105,8 +107,19 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
   const markerR = (base: number) => base / Math.sqrt(t.k)
 
   return (
-    <div>
-    <div ref={wrapRef} className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--ocean)]" onMouseLeave={() => setHover(null)}>
+    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-md)]">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border)] px-4 py-2.5 text-xs text-[var(--muted)]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="inline-flex items-center gap-1.5"><Sun size={13} className="text-[var(--sun)]" /> Day</span>
+        <span className="inline-flex items-center gap-1.5"><Moon size={13} /> Night</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]" /> Your zones ({selected.length})</span>
+        <span className="hidden sm:inline">{showAllMarkers ? 'Click a dot to add that zone' : 'Click a country to add it · scroll or pinch to zoom'}</span>
+      </div>
+      <span className="tabular font-medium text-[var(--text)]">
+        {new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(epochMs)} <span className="text-[var(--muted)]">UTC</span>
+      </span>
+    </div>
+    <div ref={wrapRef} className="relative overflow-hidden bg-[var(--ocean)]" onMouseLeave={() => setHover(null)}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -115,8 +128,8 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
         aria-label="Interactive world map. Click a country to add its time zone."
       >
         <g transform={`translate(${t.x},${t.y}) scale(${t.k})`}>
-          <path d={spherePath} fill="var(--ocean)" stroke="var(--border)" vectorEffect="non-scaling-stroke" onMouseMove={() => setHover(null)} />
-          <path d={graticulePath} pointerEvents="none" fill="none" stroke="var(--border)" strokeOpacity={0.6} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+          <path d={spherePath} fill="var(--ocean)" stroke="var(--border-strong)" vectorEffect="non-scaling-stroke" onMouseMove={() => setHover(null)} />
+          <path d={graticulePath} pointerEvents="none" fill="none" stroke="var(--graticule)" strokeWidth={0.75} vectorEffect="non-scaling-stroke" />
           <Countries
             hoverName={hover?.kind === 'country' ? hover.name : null}
             countryColor={countryColor}
@@ -127,6 +140,12 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
             <path d={night.twilight} fill="var(--night)" />
             <path d={night.dark} fill="var(--night)" />
           </g>
+          {night.sun && (
+            <g pointerEvents="none" data-testid="sun-marker" transform={`translate(${night.sun[0]},${night.sun[1]})`}>
+              <circle r={14 / Math.sqrt(t.k)} fill="var(--sun)" opacity={0.18} />
+              <circle r={6 / Math.sqrt(t.k)} fill="var(--sun)" stroke="var(--surface)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            </g>
+          )}
           {/* Zone markers: all zones when zoomed in; selected zones always. */}
           <g>
             {zoneGeo.map((z) => {
@@ -169,9 +188,6 @@ export function WorldMap({ selected, epochMs, onAdd }: Props) {
         <MapBtn label="Zoom in" onClick={() => zoomBy(1.6)}><Plus size={14} /></MapBtn>
         <MapBtn label="Zoom out" onClick={() => zoomBy(1 / 1.6)}><Minus size={14} /></MapBtn>
         <MapBtn label="Reset view" onClick={reset}><RotateCcw size={13} /></MapBtn>
-      </div>
-      <div className="pointer-events-none absolute bottom-2 left-2 hidden rounded-md sm:block bg-[var(--surface)]/85 px-2 py-1 text-[11px] text-[var(--muted)] backdrop-blur">
-        {showAllMarkers ? 'Click a dot to add that zone' : 'Click a country · scroll or pinch to zoom for cities'}
       </div>
 
       {hover && !picker && <Tooltip hover={hover} epochMs={epochMs} wrap={wrapRef} />}
@@ -216,7 +232,7 @@ const Countries = memo(function Countries({ hoverName, countryColor, onHover, on
 
 function MapBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button aria-label={label} title={label} onClick={onClick} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] shadow-sm hover:text-[var(--text)]">
+    <button aria-label={label} title={label} onClick={onClick} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 text-[var(--muted)] shadow-[var(--shadow-sm)] backdrop-blur transition hover:text-[var(--accent)] active:scale-95">
       {children}
     </button>
   )
@@ -275,7 +291,7 @@ function Tooltip({ hover, epochMs, wrap }: { hover: NonNullable<Hover>; epochMs:
     )
   }
   return (
-    <Floating x={hover.x} y={hover.y} wrap={wrap} role="tooltip" className="pointer-events-none z-10 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs shadow-lg">
+    <Floating x={hover.x} y={hover.y} wrap={wrap} role="tooltip" className="pointer-events-none z-10 min-w-48 rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 px-3.5 py-2.5 text-xs shadow-[var(--shadow-lg)] backdrop-blur">
       {body}
     </Floating>
   )
@@ -322,13 +338,13 @@ function ZonePicker({ info, x, y, docked, wrap, epochMs, onPick, onClose }: { in
   )
   if (docked) {
     return (
-      <div ref={boxRef} role="dialog" aria-label={`Choose a time zone in ${info.name}`} className="mt-2 max-h-80 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-sm">
+      <div ref={boxRef} role="dialog" aria-label={`Choose a time zone in ${info.name}`} className="max-h-80 overflow-auto border-t border-[var(--border)] bg-[var(--surface)] p-2 text-sm">
         {content}
       </div>
     )
   }
   return (
-    <Floating x={x} y={y} wrap={wrap} boxRef={boxRef} role="dialog" label={`Choose a time zone in ${info.name}`} className="z-20 w-64 max-w-[calc(100%-16px)] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-xl">
+    <Floating x={x} y={y} wrap={wrap} boxRef={boxRef} role="dialog" label={`Choose a time zone in ${info.name}`} className="z-20 w-64 max-w-[calc(100%-16px)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 text-sm shadow-[var(--shadow-lg)]">
       {content}
     </Floating>
   )
