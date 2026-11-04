@@ -16,5 +16,7 @@ updates:
     cooldown:
       default-days: 7
     groups:
+      # Minor/patch updates are grouped; each major upgrade gets its own PR to review and test.
       dependencies:
         patterns: ['*']
+        update-types: ['minor', 'patch']

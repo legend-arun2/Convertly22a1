@@ -44,6 +44,6 @@
     "world-countries": "^5.1.0"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.22"
   }
 }
