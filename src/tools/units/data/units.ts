@@ -1,0 +1,196 @@
+import { linear } from '../logic/convert'
+import type { Category, Unit } from '../logic/types'
+
+const M = 'Metric', IMP = 'Imperial / US', US = 'US customary', UK = 'Imperial (UK)', OTHER = 'Other'
+
+const temp = (id: string, name: string, symbol: string, group: string, toK: (v: number) => number, fromK: (v: number) => number): Unit =>
+  ({ id, name, symbol, group, toBase: toK, fromBase: fromK })
+
+export const categories: Category[] = [
+  {
+    id: 'length', name: 'Length', baseUnit: 'm', defaultFrom: 'cm', defaultTo: 'm',
+    units: [
+      linear('nm', 'Nanometer', 'nm', M, 1e-9),
+      linear('um', 'Micrometer', 'µm', M, 1e-6),
+      linear('mm', 'Millimeter', 'mm', M, 1e-3),
+      linear('cm', 'Centimeter', 'cm', M, 1e-2),
+      linear('dm', 'Decimeter', 'dm', M, 1e-1),
+      linear('m', 'Meter', 'm', M, 1),
+      linear('km', 'Kilometer', 'km', M, 1e3),
+      linear('in', 'Inch', 'in', IMP, 0.0254),
+      linear('ft', 'Foot', 'ft', IMP, 0.3048),
+      linear('yd', 'Yard', 'yd', IMP, 0.9144),
+      linear('mi', 'Mile', 'mi', IMP, 1609.344),
+      linear('nmi', 'Nautical mile', 'nmi', OTHER, 1852),
+      linear('au', 'Astronomical unit', 'au', OTHER, 1.495978707e11),
+      linear('ly', 'Light-year', 'ly', OTHER, 9.4607304725808e15),
+    ],
+  },
+  {
+    id: 'area', name: 'Area', baseUnit: 'm2', defaultFrom: 'm2', defaultTo: 'ft2',
+    units: [
+      linear('mm2', 'Square millimeter', 'mm²', M, 1e-6),
+      linear('cm2', 'Square centimeter', 'cm²', M, 1e-4),
+      linear('m2', 'Square meter', 'm²', M, 1),
+      linear('ha', 'Hectare', 'ha', M, 1e4),
+      linear('km2', 'Square kilometer', 'km²', M, 1e6),
+      linear('in2', 'Square inch', 'in²', IMP, 0.00064516),
+      linear('ft2', 'Square foot', 'ft²', IMP, 0.09290304),
+      linear('yd2', 'Square yard', 'yd²', IMP, 0.83612736),
+      linear('ac', 'Acre', 'ac', IMP, 4046.8564224),
+      linear('mi2', 'Square mile', 'mi²', IMP, 2589988.110336),
+    ],
+  },
+  {
+    id: 'mass', name: 'Mass', baseUnit: 'kg', defaultFrom: 'kg', defaultTo: 'lb',
+    units: [
+      linear('mg', 'Milligram', 'mg', M, 1e-6),
+      linear('g', 'Gram', 'g', M, 1e-3),
+      linear('kg', 'Kilogram', 'kg', M, 1),
+      linear('t', 'Tonne', 't', M, 1000),
+      linear('oz', 'Ounce', 'oz', IMP, 0.028349523125),
+      linear('lb', 'Pound', 'lb', IMP, 0.45359237),
+      linear('st', 'Stone', 'st', UK, 6.35029318),
+      linear('ton_us', 'Short ton (US)', 'ton', US, 907.18474),
+      linear('ton_uk', 'Long ton (UK)', 'LT', UK, 1016.0469088),
+      linear('ct', 'Carat', 'ct', OTHER, 0.0002),
+    ],
+  },
+  {
+    id: 'volume', name: 'Volume', baseUnit: 'l', defaultFrom: 'l', defaultTo: 'gal_us',
+    units: [
+      linear('ml', 'Milliliter', 'mL', M, 1e-3),
+      linear('cl', 'Centiliter', 'cL', M, 1e-2),
+      linear('l', 'Liter', 'L', M, 1),
+      linear('m3', 'Cubic meter', 'm³', M, 1000),
+      linear('cup_m', 'Metric cup', 'cup', M, 0.25),
+      linear('tsp_us', 'Teaspoon (US)', 'tsp', US, 0.00492892159375),
+      linear('tbsp_us', 'Tablespoon (US)', 'tbsp', US, 0.01478676478125),
+      linear('floz_us', 'Fluid ounce (US)', 'fl oz', US, 0.0295735295625),
+      linear('cup_us', 'Cup (US)', 'cup', US, 0.2365882365),
+      linear('pt_us', 'Pint (US)', 'pt', US, 0.473176473),
+      linear('qt_us', 'Quart (US)', 'qt', US, 0.946352946),
+      linear('gal_us', 'Gallon (US)', 'gal', US, 3.785411784),
+      linear('floz_uk', 'Fluid ounce (UK)', 'fl oz', UK, 0.0284130625),
+      linear('pt_uk', 'Pint (UK)', 'pt', UK, 0.56826125),
+      linear('qt_uk', 'Quart (UK)', 'qt', UK, 1.1365225),
+      linear('gal_uk', 'Gallon (UK)', 'gal', UK, 4.54609),
+      linear('in3', 'Cubic inch', 'in³', IMP, 0.016387064),
+      linear('ft3', 'Cubic foot', 'ft³', IMP, 28.316846592),
+    ],
+  },
+  {
+    id: 'temperature', name: 'Temperature', baseUnit: 'k', defaultFrom: 'c', defaultTo: 'f',
+    units: [
+      temp('c', 'Celsius', '°C', M, (v) => v + 273.15, (k) => k - 273.15),
+      temp('k', 'Kelvin', 'K', M, (v) => v, (k) => k),
+      temp('f', 'Fahrenheit', '°F', IMP, (v) => ((v - 32) * 5) / 9 + 273.15, (k) => ((k - 273.15) * 9) / 5 + 32),
+      temp('r', 'Rankine', '°R', IMP, (v) => (v * 5) / 9, (k) => (k * 9) / 5),
+    ],
+  },
+  {
+    id: 'speed', name: 'Speed', baseUnit: 'mps', defaultFrom: 'kmh', defaultTo: 'mph',
+    units: [
+      linear('mps', 'Meter per second', 'm/s', M, 1),
+      linear('kmh', 'Kilometer per hour', 'km/h', M, 1 / 3.6),
+      linear('mph', 'Mile per hour', 'mph', IMP, 0.44704),
+      linear('fps', 'Foot per second', 'ft/s', IMP, 0.3048),
+      linear('kn', 'Knot', 'kn', OTHER, 1852 / 3600),
+      linear('mach', 'Mach (sea level, 15 °C)', 'Ma', OTHER, 340.29),
+    ],
+  },
+  {
+    id: 'data', name: 'Data size', baseUnit: 'B', defaultFrom: 'GB', defaultTo: 'GiB',
+    units: [
+      linear('bit', 'Bit', 'bit', 'Basic', 0.125),
+      linear('B', 'Byte', 'B', 'Basic', 1),
+      linear('kB', 'Kilobyte', 'kB', 'Decimal (SI)', 1e3),
+      linear('MB', 'Megabyte', 'MB', 'Decimal (SI)', 1e6),
+      linear('GB', 'Gigabyte', 'GB', 'Decimal (SI)', 1e9),
+      linear('TB', 'Terabyte', 'TB', 'Decimal (SI)', 1e12),
+      linear('PB', 'Petabyte', 'PB', 'Decimal (SI)', 1e15),
+      linear('KiB', 'Kibibyte', 'KiB', 'Binary (IEC)', 2 ** 10),
+      linear('MiB', 'Mebibyte', 'MiB', 'Binary (IEC)', 2 ** 20),
+      linear('GiB', 'Gibibyte', 'GiB', 'Binary (IEC)', 2 ** 30),
+      linear('TiB', 'Tebibyte', 'TiB', 'Binary (IEC)', 2 ** 40),
+    ],
+  },
+  {
+    id: 'pressure', name: 'Pressure', baseUnit: 'Pa', defaultFrom: 'bar', defaultTo: 'psi',
+    units: [
+      linear('Pa', 'Pascal', 'Pa', M, 1),
+      linear('hPa', 'Hectopascal', 'hPa', M, 100),
+      linear('kPa', 'Kilopascal', 'kPa', M, 1e3),
+      linear('MPa', 'Megapascal', 'MPa', M, 1e6),
+      linear('bar', 'Bar', 'bar', M, 1e5),
+      linear('mbar', 'Millibar', 'mbar', M, 100),
+      linear('psi', 'Pound per square inch', 'psi', IMP, 6894.757293168),
+      linear('inHg', 'Inch of mercury', 'inHg', IMP, 3386.389),
+      linear('atm', 'Atmosphere', 'atm', OTHER, 101325),
+      linear('mmHg', 'Millimeter of mercury', 'mmHg', OTHER, 133.322387415),
+    ],
+  },
+  {
+    id: 'energy', name: 'Energy', baseUnit: 'J', defaultFrom: 'kcal', defaultTo: 'kJ',
+    units: [
+      linear('J', 'Joule', 'J', M, 1),
+      linear('kJ', 'Kilojoule', 'kJ', M, 1e3),
+      linear('MJ', 'Megajoule', 'MJ', M, 1e6),
+      linear('Wh', 'Watt-hour', 'Wh', M, 3600),
+      linear('kWh', 'Kilowatt-hour', 'kWh', M, 3.6e6),
+      linear('cal', 'Calorie', 'cal', OTHER, 4.184),
+      linear('kcal', 'Kilocalorie (food Calorie)', 'kcal', OTHER, 4184),
+      linear('BTU', 'British thermal unit', 'BTU', IMP, 1055.05585262),
+      linear('ftlbf', 'Foot-pound', 'ft·lbf', IMP, 1.3558179483314004),
+      linear('eV', 'Electronvolt', 'eV', OTHER, 1.602176634e-19),
+    ],
+  },
+  {
+    id: 'time', name: 'Time', baseUnit: 's', defaultFrom: 'h', defaultTo: 'min',
+    units: [
+      linear('ms', 'Millisecond', 'ms', 'Units', 1e-3),
+      linear('s', 'Second', 's', 'Units', 1),
+      linear('min', 'Minute', 'min', 'Units', 60),
+      linear('h', 'Hour', 'h', 'Units', 3600),
+      linear('d', 'Day', 'd', 'Units', 86400),
+      linear('wk', 'Week', 'wk', 'Units', 604800),
+      linear('mo', 'Month (average)', 'mo', 'Units', 2629746),
+      linear('yr', 'Year (Gregorian average)', 'yr', 'Units', 31556952),
+      linear('dec', 'Decade', 'dec', 'Units', 315569520),
+      linear('cent', 'Century', 'c.', 'Units', 3155695200),
+    ],
+  },
+]
+
+/** Side-by-side metric ↔ imperial/US equivalents for the comparison view. */
+export const comparisons: { category: string; metric: string; other: string; value: number; otherValue?: number }[] = [
+  { category: 'length', metric: 'cm', other: 'in', value: 2.54, otherValue: 1 },
+  { category: 'length', metric: 'm', other: 'ft', value: 1 },
+  { category: 'length', metric: 'm', other: 'yd', value: 1 },
+  { category: 'length', metric: 'km', other: 'mi', value: 1 },
+  { category: 'area', metric: 'm2', other: 'ft2', value: 1 },
+  { category: 'area', metric: 'ha', other: 'ac', value: 1 },
+  { category: 'mass', metric: 'g', other: 'oz', value: 100 },
+  { category: 'mass', metric: 'kg', other: 'lb', value: 1 },
+  { category: 'mass', metric: 't', other: 'ton_us', value: 1 },
+  { category: 'volume', metric: 'ml', other: 'floz_us', value: 100 },
+  { category: 'volume', metric: 'l', other: 'gal_us', value: 1 },
+  { category: 'volume', metric: 'l', other: 'gal_uk', value: 1 },
+  { category: 'temperature', metric: 'c', other: 'f', value: 0 },
+  { category: 'temperature', metric: 'c', other: 'f', value: 37 },
+  { category: 'temperature', metric: 'c', other: 'f', value: 100 },
+  { category: 'speed', metric: 'kmh', other: 'mph', value: 100 },
+  { category: 'pressure', metric: 'bar', other: 'psi', value: 1 },
+  { category: 'energy', metric: 'kJ', other: 'BTU', value: 1 },
+]
+
+/** Everyday references to get a feel for sizes. */
+export const references: { label: string; metric: string; imperial: string }[] = [
+  { label: 'Credit card width', metric: '8.56 cm', imperial: '3.37 in' },
+  { label: 'Door height (typical)', metric: '2.03 m', imperial: '6 ft 8 in' },
+  { label: 'Football (soccer) pitch', metric: '0.71 ha', imperial: '1.76 acres' },
+  { label: 'Bag of sugar', metric: '1 kg', imperial: '2.2 lb' },
+  { label: 'Bottle of water', metric: '500 mL', imperial: '16.9 US fl oz' },
+  { label: 'Room temperature', metric: '20 °C', imperial: '68 °F' },
+  { label: 'Highway speed', metric: '110 km/h', imperial: '68 mph' },
+]
