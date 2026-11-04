@@ -65,5 +65,5 @@ Vitest only collects `src/**/*.test.ts` (see `vite.config.ts`). Besides the co-l
 - **Cloud sandbox limits:**
   - `npm audit signatures` fails with a 403 because the proxy blocks Sigstore; it works on GitHub runners.
   - `*.github.io` is blocked, so the live site can't be fetched from here.
-  - `main` is protected by a repository ruleset, and pushes from this sandbox (to `main` or new branches) are declined. Commit locally and tell the user what to push, unless they've granted a bypass.
+  - `main` is protected by a repository ruleset, so a push can be declined ("push declined due to repository rule violations"). If that happens, keep the commit local, tell the user, and retry when they ask (it has succeeded on retry before). Don't work around it with new branches or force pushes.
   - The `gh` token is invalid, but the unauthenticated GitHub REST API is readable. Check deploys with `curl -s "https://api.github.com/repos/legend-arun2/convertly22a1/actions/runs?head_sha=$(git rev-parse HEAD)"`, and job logs with `/actions/jobs/<id>/logs`.
